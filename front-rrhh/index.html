@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel RRHH - Registro</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f0f4f8; min-height: 100vh; }
+    .header { background: #1F4E79; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .login-screen, .main-screen { padding: 24px; max-width: 480px; margin: 0 auto; }
+    .card { background: #fff; border-radius: 16px; padding: 28px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-top: 24px; }
+    .card h2 { font-size: 17px; color: #1F4E79; margin-bottom: 20px; }
+    label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; margin-top: 14px; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #dde3ea;
+      border-radius: 10px; font-size: 15px; outline: none;
+    }
+    input:focus { border-color: #1F4E79; }
+    .btn {
+      margin-top: 20px; width: 100%; padding: 14px; font-size: 15px;
+      font-weight: 600; border: none; border-radius: 10px; cursor: pointer;
+      background: #1F4E79; color: #fff;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.danger { background: #c0392b; margin-top: 10px; }
+    .btn.gray { background: #555; }
+    .cam-wrapper { width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-top: 14px; }
+    video { width: 100%; display: block; max-height: 260px; object-fit: cover; }
+    canvas { display: none; }
+    .preview { width: 100%; border-radius: 12px; margin-top: 10px; display: none; }
+    .alert { margin-top: 16px; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: 600; text-align: center; display: none; }
+    .alert.ok { background: #e8f5e9; color: #2e7d32; border: 1.5px solid #2e7d32; }
+    .alert.err { background: #fdecea; color: #c62828; border: 1.5px solid #c62828; }
+    .spinner { display: none; text-align: center; margin-top: 14px; color: #888; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="header"><span>👥</span><h1>Panel de Recursos Humanos</h1></div>
+
+  <div class="login-screen" id="loginScreen">
+    <div class="card">
+      <h2>🔒 Acceso Restringido</h2>
+      <label>Usuario</label>
+      <input type="text" id="usuario" placeholder="rrhh"/>
+      <label>Contraseña</label>
+      <input type="password" id="password" placeholder="Contraseña" onkeydown="if(event.key==='Enter') login()"/>
+      <button class="btn" id="btnLogin" onclick="login()">Ingresar</button>
+      <div class="alert err" id="loginError"></div>
+    </div>
+  </div>
+
+  <div class="main-screen" id="mainScreen" style="display:none">
+    <div class="card">
+      <h2>➕ Registrar Empleado</h2>
+      <label>Número de identificación</label>
+      <input type="text" id="identificacion" placeholder="Ej: 1234567890"/>
+      <label>Nombre completo</label>
+      <input type="text" id="nombre" placeholder="Ej: Juan Pérez"/>
+      <label>Foto del empleado</label>
+      <div class="cam-wrapper"><video id="video" autoplay playsinline muted></video></div>
+      <canvas id="canvas"></canvas>
+      <img class="preview" id="preview"/>
+      <button class="btn" id="btnFoto" onclick="tomarFoto()">📷 Tomar Foto</button>
+      <button class="btn gray" id="btnRepetir" onclick="repetirFoto()" style="display:none">🔄 Repetir Foto</button>
+      <button class="btn" id="btnRegistrar" onclick="registrar()" style="display:none">✅ Registrar Empleado</button>
+      <div class="spinner" id="spinner">⏳ Registrando...</div>
+      <div class="alert ok" id="alertOk"></div>
+      <div class="alert err" id="alertErr"></div>
+      <button class="btn danger" onclick="cerrarSesion()">Cerrar Sesión</button>
+    </div>
+  </div>
+
+  <script>
+    const API_RRHH    = "https://uadjcukyx1.execute-api.us-east-1.amazonaws.com/prod/registrar";
+    const API_KEY     = "UBsklq8EyX8pPI2W2sHIp39gxALuSAGv7posYBGW";
+    const COGNITO_URL = "https://cognito-idp.us-east-1.amazonaws.com/";
+    const CLIENT_ID   = "4m6h60gemeakp7e0a7vfk8smpe";
+
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const preview = document.getElementById("preview");
+    let fotoBase64 = null;
+    let accessToken = null;
+
+    async function login() {
+      const usuario  = document.getElementById("usuario").value.trim();
+      const password = document.getElementById("password").value;
+      const btnLogin = document.getElementById("btnLogin");
+      const loginError = document.getElementById("loginError");
+
+      btnLogin.disabled = true;
+      loginError.style.display = "none";
+
+      try {
+        const res = await fetch(COGNITO_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-amz-json-1.1",
+            "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth"
+          },
+          body: JSON.stringify({
+            AuthFlow: "USER_PASSWORD_AUTH",
+            ClientId: CLIENT_ID,
+            AuthParameters: { USERNAME: usuario, PASSWORD: password }
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.AuthenticationResult) {
+          accessToken = data.AuthenticationResult.AccessToken;
+          document.getElementById("loginScreen").style.display = "none";
+          document.getElementById("mainScreen").style.display = "block";
+          iniciarCamara();
+        } else {
+          loginError.innerHTML = "Usuario o contraseña incorrectos";
+          loginError.style.display = "block";
+        }
+      } catch(e) {
+        loginError.innerHTML = "Error de conexión";
+        loginError.style.display = "block";
+      }
+
+      btnLogin.disabled = false;
+    }
+
+    function cerrarSesion() {
+      accessToken = null;
+      fotoBase64 = null;
+      document.getElementById("loginScreen").style.display = "block";
+      document.getElementById("mainScreen").style.display = "none";
+      document.getElementById("password").value = "";
+      document.getElementById("usuario").value = "";
+    }
+
+    function iniciarCamara() {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+        .then(stream => { video.srcObject = stream; })
+        .catch(() => alert("No se pudo acceder a la cámara"));
+    }
+
+    function tomarFoto() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+      fotoBase64 = canvas.toDataURL("image/jpeg", 0.85);
+      preview.src = fotoBase64;
+      preview.style.display = "block";
+      video.style.display = "none";
+      document.getElementById("btnFoto").style.display = "none";
+      document.getElementById("btnRepetir").style.display = "block";
+      document.getElementById("btnRegistrar").style.display = "block";
+    }
+
+    function repetirFoto() {
+      fotoBase64 = null;
+      preview.style.display = "none";
+      video.style.display = "block";
+      document.getElementById("btnFoto").style.display = "block";
+      document.getElementById("btnRepetir").style.display = "none";
+      document.getElementById("btnRegistrar").style.display = "none";
+    }
+
+    async function registrar() {
+      const identificacion = document.getElementById("identificacion").value.trim();
+      const nombre = document.getElementById("nombre").value.trim();
+      if (!identificacion || !nombre || !fotoBase64) {
+        mostrarAlerta("err", "Complete todos los campos y tome la foto");
+        return;
+      }
+      document.getElementById("spinner").style.display = "block";
+      document.getElementById("btnRegistrar").disabled = true;
+      try {
+        const res = await fetch(API_RRHH, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": API_KEY },
+          body: JSON.stringify({ identificacion, nombre, foto: fotoBase64 })
+        });
+        const data = await res.json();
+        const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+        if (body.codigo === 0) {
+          mostrarAlerta("ok", `✅ ${body.nombre} registrado exitosamente`);
+          limpiarFormulario();
+        } else {
+          mostrarAlerta("err", body.descripcion || "Error al registrar");
+        }
+      } catch(e) {
+        mostrarAlerta("err", "Error de conexión");
+      }
+      document.getElementById("spinner").style.display = "none";
+      document.getElementById("btnRegistrar").disabled = false;
+    }
+
+    function limpiarFormulario() {
+      document.getElementById("identificacion").value = "";
+      document.getElementById("nombre").value = "";
+      repetirFoto();
+    }
+
+    function mostrarAlerta(tipo, msg) {
+      const ok  = document.getElementById("alertOk");
+      const err = document.getElementById("alertErr");
+      ok.style.display = "none"; err.style.display = "none";
+      if (tipo === "ok") { ok.innerHTML = msg; ok.style.display = "block"; }
+      else { err.innerHTML = msg; err.style.display = "block"; }
+      setTimeout(() => { ok.style.display = "none"; err.style.display = "none"; }, 5000);
+    }
+  </script>
+</body>
+</html>

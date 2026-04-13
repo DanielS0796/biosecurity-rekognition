@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel de Auditoría</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f0f4f8; min-height: 100vh; }
+    .header {
+      background: #1a4731; color: #fff; padding: 16px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header h1 { font-size: 18px; font-weight: 600; }
+    .container { padding: 24px; max-width: 900px; margin: 0 auto; }
+    .card {
+      background: #fff; border-radius: 16px; padding: 28px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-top: 24px;
+    }
+    .card h2 { font-size: 17px; color: #1a4731; margin-bottom: 20px; }
+    label { font-size: 13px; color: #555; display: block; margin-bottom: 4px; margin-top: 14px; }
+    input[type="password"], input[type="date"] {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #dde3ea;
+      border-radius: 10px; font-size: 15px; outline: none;
+    }
+    input:focus { border-color: #1a4731; }
+    .btn {
+      margin-top: 16px; padding: 12px 24px; font-size: 15px; font-weight: 600;
+      border: none; border-radius: 10px; cursor: pointer;
+      background: #1a4731; color: #fff;
+    }
+    .btn.secondary { background: #0f3460; margin-left: 10px; }
+    .btn.danger { background: #c0392b; margin: 0; padding: 8px 16px; font-size: 13px; }
+    .filters { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px; }
+    .filters .field { flex: 1; min-width: 160px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat { background: #f8fafc; border-radius: 12px; padding: 16px; text-align: center; border: 1.5px solid #e2e8f0; }
+    .stat .num { font-size: 28px; font-weight: 700; }
+    .stat .lbl { font-size: 12px; color: #888; margin-top: 4px; }
+    .stat.verde .num { color: #2e7d32; }
+    .stat.rojo .num { color: #c62828; }
+    .stat.azul .num { color: #0f3460; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #1a4731; color: #fff; padding: 12px 14px; text-align: left; font-weight: 500; }
+    th:first-child { border-radius: 8px 0 0 0; }
+    th:last-child { border-radius: 0 8px 0 0; }
+    td { padding: 11px 14px; border-bottom: 1px solid #f0f4f8; }
+    tr:hover td { background: #f8fafc; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge.exitoso { background: #e8f5e9; color: #2e7d32; }
+    .badge.fallido { background: #fdecea; color: #c62828; }
+    .alert { margin-top: 16px; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: 600; display: none; }
+    .alert.err { background: #fdecea; color: #c62828; border: 1.5px solid #c62828; }
+    .spinner { display: none; text-align: center; margin: 20px 0; color: #888; }
+    .empty { text-align: center; padding: 40px; color: #aaa; font-size: 15px; }
+    #loginScreen { padding: 24px; }
+    #loginScreen .card { max-width: 400px; margin: 60px auto; }
+  </style>
+</head>
+<body>
+
+  <div id="loginScreen">
+    <div class="card">
+      <h2>🔒 Panel de Auditoría</h2>
+      <label>Contraseña de administrador</label>
+      <input type="password" id="password" placeholder="Ingrese la contraseña"
+        onkeydown="if(event.key==='Enter') login()"/>
+      <button class="btn" onclick="login()">Ingresar</button>
+      <div class="alert err" id="loginError">Contraseña incorrecta</div>
+    </div>
+  </div>
+
+  <div id="mainScreen" style="display:none">
+    <div class="header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:24px">📊</span>
+        <h1>Panel de Auditoría de Accesos</h1>
+      </div>
+      <button class="btn danger" onclick="cerrarSesion()">Salir</button>
+    </div>
+
+    <div class="container">
+      <div class="card">
+        <div class="filters">
+          <div class="field">
+            <label>Desde</label>
+            <input type="date" id="fechaDesde"/>
+          </div>
+          <div class="field">
+            <label>Hasta</label>
+            <input type="date" id="fechaHasta"/>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:8px;padding-bottom:0">
+            <button class="btn" onclick="cargarDatos()">🔍 Buscar</button>
+            <button class="btn secondary" onclick="descargarCSV()">⬇️ Exportar</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat azul">
+            <div class="num" id="statTotal">0</div>
+            <div class="lbl">Total accesos</div>
+          </div>
+          <div class="stat verde">
+            <div class="num" id="statExitosos">0</div>
+            <div class="lbl">Exitosos</div>
+          </div>
+          <div class="stat rojo">
+            <div class="num" id="statFallidos">0</div>
+            <div class="lbl">Fallidos</div>
+          </div>
+        </div>
+
+        <div class="spinner" id="spinner">⏳ Cargando datos...</div>
+        <div id="tablaContainer">
+          <div class="empty">Presione Buscar para cargar los registros</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_AUDITORIA = "https://3tqg18yo1l.execute-api.us-east-1.amazonaws.com/prod/reporte";
+    const API_KEY       = "XYyh4xXyyka10J27CVIaA4UiKpjDW37a4lepAX1n";
+    const PASSWORD      = "Admin2024!";
+
+    let datosGlobales = [];
+
+    function login() {
+      if (document.getElementById("password").value === PASSWORD) {
+        document.getElementById("loginScreen").style.display = "none";
+        document.getElementById("mainScreen").style.display = "block";
+        setFechasHoy();
+        cargarDatos();
+      } else {
+        document.getElementById("loginError").style.display = "block";
+      }
+    }
+
+    function cerrarSesion() {
+      document.getElementById("loginScreen").style.display = "block";
+      document.getElementById("mainScreen").style.display = "none";
+      document.getElementById("password").value = "";
+      datosGlobales = [];
+    }
+
+    function setFechasHoy() {
+      const hoy = new Date().toISOString().split("T")[0];
+      const hace30 = new Date(Date.now() - 30*24*60*60*1000).toISOString().split("T")[0];
+      document.getElementById("fechaDesde").value = hace30;
+      document.getElementById("fechaHasta").value = hoy;
+    }
+
+    async function cargarDatos() {
+      document.getElementById("spinner").style.display = "block";
+      document.getElementById("tablaContainer").innerHTML = "";
+
+      try {
+        const res = await fetch(API_AUDITORIA + "?format=json", {
+          method: "GET",
+          headers: { "x-api-key": API_KEY }
+        });
+        const data = await res.json();
+        const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+        datosGlobales = body.items || [];
+        renderTabla(datosGlobales);
+      } catch(e) {
+        document.getElementById("tablaContainer").innerHTML =
+          '<div class="empty">⚠️ Error de conexión</div>';
+      }
+
+      document.getElementById("spinner").style.display = "none";
+    }
+
+    function renderTabla(items) {
+      const desde = document.getElementById("fechaDesde").value;
+      const hasta = document.getElementById("fechaHasta").value;
+
+      const filtrados = items.filter(i => {
+        if (!i.fecha_hora) return true;
+        const fecha = i.fecha_hora.split("T")[0];
+        return (!desde || fecha >= desde) && (!hasta || fecha <= hasta);
+      });
+
+      document.getElementById("statTotal").textContent = filtrados.length;
+      document.getElementById("statExitosos").textContent = filtrados.filter(i => i.resultado === "EXITOSO").length;
+      document.getElementById("statFallidos").textContent = filtrados.filter(i => i.resultado === "FALLIDO").length;
+
+      if (filtrados.length === 0) {
+        document.getElementById("tablaContainer").innerHTML =
+          '<div class="empty">No hay registros en el período seleccionado</div>';
+        return;
+      }
+
+      const filas = filtrados
+        .sort((a, b) => (b.fecha_hora || "").localeCompare(a.fecha_hora || ""))
+        .map(i => `
+          <tr>
+            <td>${formatFecha(i.fecha_hora)}</td>
+            <td>${i.identificacion || "-"}</td>
+            <td><span class="badge ${(i.resultado || "").toLowerCase()}">${i.resultado || "-"}</span></td>
+            <td>${i.similitud ? parseFloat(i.similitud).toFixed(1) + "%" : "-"}</td>
+          </tr>
+        `).join("");
+
+      document.getElementById("tablaContainer").innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Identificación</th>
+              <th>Resultado</th>
+              <th>Similitud</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      `;
+    }
+
+    function formatFecha(iso) {
+      if (!iso) return "-";
+      const d = new Date(iso);
+      return d.toLocaleDateString("es-CO") + " " + d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function descargarCSV() {
+      if (datosGlobales.length === 0) {
+        alert("No hay datos. Presione Buscar primero.");
+        return;
+      }
+      const headers = ["Fecha y Hora","Identificacion","Resultado","Similitud (%)","ID Acceso"];
+      const rows = datosGlobales.map(i => [
+        i.fecha_hora || "",
+        i.identificacion || "",
+        i.resultado || "",
+        i.similitud || "0",
+        i.id_acceso || ""
+      ]);
+      const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `accesos_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>

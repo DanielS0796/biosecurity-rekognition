@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="theme-color" content="#1a1a2e"/>
+  <link rel="manifest" href="manifest.json"/>
+  <title>Control de Acceso</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #1a1a2e;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .logo { font-size: 48px; margin-bottom: 10px; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+    p.sub { font-size: 13px; color: #888; margin-bottom: 30px; }
+    .cam-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 3px solid #16213e;
+      background: #000;
+    }
+    video { width: 100%; display: block; border-radius: 17px; }
+    .overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .face-frame {
+      width: 200px;
+      height: 240px;
+      border: 3px solid rgba(255,255,255,0.4);
+      border-radius: 50%;
+    }
+    canvas { display: none; }
+    .btn {
+      margin-top: 24px;
+      width: 100%;
+      max-width: 360px;
+      padding: 18px;
+      font-size: 17px;
+      font-weight: 600;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      background: #0f3460;
+      color: #fff;
+      transition: all 0.2s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .resultado {
+      margin-top: 20px;
+      width: 100%;
+      max-width: 360px;
+      padding: 18px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+      display: none;
+    }
+    .resultado.exito { background: #1a4731; border: 2px solid #2ecc71; color: #2ecc71; }
+    .resultado.error { background: #4a1a1a; border: 2px solid #e74c3c; color: #e74c3c; }
+    .spinner { display: none; margin-top: 20px; font-size: 14px; color: #888; }
+  </style>
+</head>
+<body>
+  <div class="logo">🔐</div>
+  <h1>Control de Acceso</h1>
+  <p class="sub">Mire a la cámara y presione validar</p>
+
+  <div class="cam-wrapper">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="overlay"><div class="face-frame"></div></div>
+  </div>
+
+  <canvas id="canvas"></canvas>
+  <button class="btn" id="btn" onclick="validar()">Validar Acceso</button>
+  <div class="spinner" id="spinner">⏳ Validando...</div>
+  <div class="resultado" id="resultado"></div>
+
+  <script>
+    const API_URL = "https://9bm7r0q9wi.execute-api.us-east-1.amazonaws.com/best/validar";
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const btn = document.getElementById("btn");
+    const spinner = document.getElementById("spinner");
+    const resultado = document.getElementById("resultado");
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then(stream => { video.srcObject = stream; })
+      .catch(err => { console.error(err); alert("No se pudo acceder a la cámara"); });
+
+    async function validar() {
+      btn.disabled = true;
+      spinner.style.display = "block";
+      resultado.style.display = "none";
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+      const imgBase64 = canvas.toDataURL("image/jpeg", 0.8);
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imgvalidacion: imgBase64 })
+        });
+        const data = await res.json();
+        const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+        resultado.style.display = "block";
+        if (body.codigo === 0) {
+          resultado.className = "resultado exito";
+          resultado.innerHTML = `✅ Acceso Permitido<br><small>ID: ${body.similutud}</small>`;
+        } else {
+          resultado.className = "resultado error";
+          resultado.innerHTML = "❌ Acceso Denegado<br><small>Rostro no reconocido</small>";
+        }
+      } catch (e) {
+        resultado.style.display = "block";
+        resultado.className = "resultado error";
+        resultado.innerHTML = "⚠️ Error de conexión";
+      }
+
+      spinner.style.display = "none";
+      btn.disabled = false;
+      setTimeout(() => { resultado.style.display = "none"; }, 5000);
+    }
+
+  </script>
+</body>
+</html>
