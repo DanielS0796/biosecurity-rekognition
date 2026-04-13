@@ -1,55 +1,59 @@
-from diagrams import Diagram, Edge, Cluster
+from diagrams import Diagram, Cluster
 from diagrams.aws.compute import Lambda
-from diagrams.aws.storage import S3
-from diagrams.aws.network import APIGateway, CloudFront
-from diagrams.aws.ml import Rekognition
 from diagrams.aws.database import Dynamodb
-from diagrams.aws.security import IAM, Cognito, KMS
+from diagrams.aws.network import APIGateway, CloudFront
+from diagrams.aws.storage import S3
+from diagrams.aws.ml import Rekognition
+from diagrams.aws.security import IAMRole, KMS
 from diagrams.aws.general import General
+from diagrams.onprem.client import User
 
-with Diagram("Biosecurity - Arquitectura Final", filename="arquitectura", show=False, direction="LR"):
+with Diagram("Biosecurity UCompensar", filename="arquitectura", outformat="png", show=False, direction="TB"):
 
-    # Seguridad global
-    kms = KMS("KMS\nbiosecurity-key")
-    iam = IAM("IAM Role\npermisos minimos")
-    cog = Cognito("Cognito\nUser Pool")
+    usuario = User("Usuario / Celular")
 
-    # Frontend
-    cf  = CloudFront("CloudFront\nHTTPS")
-    s3  = S3("S3\nbuckebiosecurity\n🔒 KMS cifrado")
+    with Cluster("Frontend"):
+        cf = CloudFront("CloudFront")
+        s3 = S3("S3 buckebiosecurity")
+        cf >> s3
 
-    cf >> s3
-    kms >> Edge(style="dashed", color="red") >> s3
+    usuario >> cf
 
-    with Cluster("1. Terminal Acceso - Publico"):
-        api1 = APIGateway("API GW\n/best/validar")
-        l1   = Lambda("λ validacion\nderostros")
-        rek  = Rekognition("Rekognition\ncoleccion2anlusoft")
-        db1  = Dynamodb("DynamoDB\nbiosecurity-accesos")
-        api1 >> l1 >> rek
-        l1   >> db1
+    with Cluster("API Gateway"):
+        api_val  = APIGateway("Validación\n(Público)")
+        api_rrhh = APIGateway("RRHH\n(API Key)")
+        api_aud  = APIGateway("Auditoría\n(API Key)")
 
-    with Cluster("2. Panel RRHH - API Key"):
-        api2 = APIGateway("API GW\n/prod/registrar\n🔑 API Key")
-        l2   = Lambda("λ registrar\nempleado")
-        db2  = Dynamodb("DynamoDB\nbiosecurity-empleados")
-        api2 >> l2 >> rek
-        l2   >> db2
+    cf >> api_val
+    cf >> api_rrhh
+    cf >> api_aud
 
-    with Cluster("3. Panel Auditoria - API Key"):
-        api3 = APIGateway("API GW\n/prod/reporte\n🔑 API Key")
-        l3   = Lambda("λ auditoria\nCSV/JSON")
-        api3 >> l3 >> db1
+    with Cluster("Lambdas"):
+        lam_val = Lambda("validacionderostros")
+        lam_reg = Lambda("registrar-empleado")
+        lam_aud = Lambda("biosecurity-auditoria")
 
-    # Cognito protege RRHH y Auditoria
-    cog >> Edge(style="dashed", color="orange", label="auth") >> api2
-    cog >> Edge(style="dashed", color="orange", label="auth") >> api3
+    api_val  >> lam_val
+    api_rrhh >> lam_reg
+    api_aud  >> lam_aud
 
-    # IAM controla las lambdas
-    iam >> Edge(style="dashed", color="gray") >> l1
-    iam >> Edge(style="dashed", color="gray") >> l2
-    iam >> Edge(style="dashed", color="gray") >> l3
+    rek = Rekognition("coleccion2anlusoft")
+    lam_val >> rek
+    lam_reg >> rek
 
-    # KMS cifra DynamoDB y S3
-    kms >> Edge(style="dashed", color="red") >> db1
-    kms >> Edge(style="dashed", color="red") >> db2
+    with Cluster("DynamoDB"):
+        db_emp = Dynamodb("empleados")
+        db_acc = Dynamodb("accesos")
+        db_ret = Dynamodb("retirados")
+
+    lam_val >> db_acc
+    lam_val >> db_emp
+    lam_reg >> db_emp
+    lam_reg >> db_ret
+    lam_aud >> db_acc
+
+    with Cluster("Seguridad"):
+        iam = IAMRole("IAM Role")
+        kms = KMS("KMS Key")
+
+    s3 >> kms
