@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="theme-color" content="#F05A22"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <link rel="manifest" href="manifest.json"/>
+  <title>Biosecurity · UCompensar</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --orange: #F05A22;
+      --orange-dark: #C94A18;
+      --purple: #4B2D8F;
+      --purple-dark: #321E6B;
+      --blue: #1A2D5A;
+      --cyan: #00B4D8;
+      --white: #ffffff;
+      --glass: rgba(255,255,255,0.15);
+      --glass-strong: rgba(255,255,255,0.92);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Nunito', sans-serif;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      background: var(--purple-dark);
+    }
+
+    /* ── FONDO COLLAGE ── */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+    .bg-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      height: 100%;
+      width: 100%;
+    }
+    .bg-cell {
+      background-size: cover;
+      background-position: center;
+      filter: saturate(0.6) brightness(0.7);
+    }
+    .bg-cell:nth-child(1) { background: linear-gradient(135deg, #F05A22, #FF8C42); }
+    .bg-cell:nth-child(2) { background: linear-gradient(135deg, #4B2D8F, #6B4CC0); }
+    .bg-cell:nth-child(3) { background: linear-gradient(135deg, #00B4D8, #0077A8); }
+    .bg-cell:nth-child(4) { background: linear-gradient(135deg, #1A2D5A, #2D4A8A); }
+    .bg-cell:nth-child(5) { background: linear-gradient(135deg, #F05A22, #4B2D8F); }
+    .bg-cell:nth-child(6) { background: linear-gradient(135deg, #00B4D8, #4B2D8F); }
+    .bg-cell:nth-child(7) { background: linear-gradient(135deg, #4B2D8F, #00B4D8); }
+    .bg-cell:nth-child(8) { background: linear-gradient(135deg, #1A2D5A, #F05A22); }
+    .bg-cell:nth-child(9) { background: linear-gradient(135deg, #F05A22, #1A2D5A); }
+
+    .bg-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(160deg, rgba(75,45,143,0.75) 0%, rgba(26,45,90,0.85) 50%, rgba(75,45,143,0.75) 100%);
+    }
+
+    /* Círculos decorativos */
+    .bg-circle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .bg-circle-1 {
+      width: 300px; height: 300px;
+      background: rgba(240,90,34,0.35);
+      top: -80px; left: -80px;
+    }
+    .bg-circle-2 {
+      width: 250px; height: 250px;
+      background: rgba(0,180,216,0.25);
+      bottom: 100px; right: -60px;
+    }
+    .bg-circle-3 {
+      width: 180px; height: 180px;
+      background: rgba(75,45,143,0.4);
+      top: 40%; left: 60%;
+    }
+
+    /* ── LAYOUT ── */
+    .app {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      padding: 20px 20px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-dots {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      width: 36px;
+    }
+    .logo-dots span {
+      width: 14px; height: 14px;
+      background: var(--orange);
+      border-radius: 50%;
+      display: block;
+    }
+    .logo-dots span:nth-child(3) { grid-column: 1; }
+    .logo-dots span:nth-child(4) { display: none; }
+
+    /* Logo 6 puntos estilo compensar */
+    .logo-dots-6 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+      width: 32px;
+    }
+    .logo-dots-6 span {
+      width: 13px; height: 13px;
+      background: white;
+      border-radius: 50%;
+      display: block;
+    }
+    .logo-dots-6 span.empty { background: transparent; }
+
+    .logo-text {
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: 0.3px;
+    }
+    .logo-text strong { display: block; font-size: 11px; font-weight: 400; opacity: 0.85; }
+
+    .divider-v {
+      width: 1px;
+      height: 30px;
+      background: rgba(255,255,255,0.4);
+    }
+
+    .app-title {
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }
+
+    /* ── NAVBAR ── */
+    .navbar {
+      display: flex;
+      gap: 6px;
+      padding: 0 16px;
+      margin-top: 4px;
+    }
+
+    .nav-btn {
+      flex: 1;
+      padding: 10px 6px;
+      border: none;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.7);
+      font-family: 'Nunito', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      border: 1.5px solid rgba(255,255,255,0.1);
+    }
+    .nav-btn .nav-icon { font-size: 18px; }
+    .nav-btn.active {
+      background: var(--orange);
+      color: white;
+      border-color: var(--orange);
+      box-shadow: 0 4px 15px rgba(240,90,34,0.4);
+    }
+    .nav-btn:not(.active):hover {
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+
+    /* ── CONTENT ── */
+    .content {
+      flex: 1;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel { display: none; flex-direction: column; gap: 16px; animation: fadeIn 0.3s ease; }
+    .panel.active { display: flex; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: rgba(255,255,255,0.75);
+      border-radius: 20px;
+      padding: 24px 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.4);
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--blue);
+      margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 18px;
+    }
+
+    /* ── CAMERA ── */
+    .cam-wrap {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #000;
+      aspect-ratio: 3/4;
+      max-height: 300px;
+    }
+    .cam-wrap video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .cam-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+    .face-ring {
+      width: 160px; height: 190px;
+      border: 3px solid rgba(255,255,255,0.6);
+      border-radius: 50%;
+      box-shadow: 0 0 0 2000px rgba(0,0,0,0.35);
+    }
+    .face-ring.detecting {
+      border-color: var(--orange);
+      animation: pulse-ring 1s infinite;
+    }
+    @keyframes pulse-ring {
+      0%, 100% { box-shadow: 0 0 0 2000px rgba(0,0,0,0.35), 0 0 0 0 rgba(240,90,34,0.4); }
+      50% { box-shadow: 0 0 0 2000px rgba(0,0,0,0.35), 0 0 12px 4px rgba(240,90,34,0.6); }
+    }
+
+    .cam-status {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.6);
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    /* ── BOTONES ── */
+    .btn-primary {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      background: var(--orange);
+      color: white;
+      font-family: 'Nunito', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 15px rgba(240,90,34,0.35);
+    }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      width: 100%;
+      padding: 14px;
+      border: 2px solid var(--blue);
+      border-radius: 14px;
+      background: transparent;
+      color: var(--blue);
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-secondary:active { background: var(--blue); color: white; }
+
+    .btn-danger {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: #fee2e2;
+      color: #c62828;
+      font-family: 'Nunito', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* ── RESULTADO ── */
+    .resultado {
+      padding: 16px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      text-align: center;
+      display: none;
+    }
+    .resultado.exito { background: #e8f5e9; color: #2e7d32; border: 2px solid #2e7d32; }
+    .resultado.error { background: #fdecea; color: #c62828; border: 2px solid #c62828; }
+    .resultado.show { display: block; animation: fadeIn 0.3s ease; }
+
+    /* ── INPUTS ── */
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #444;
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      padding: 13px 16px;
+      border: 2px solid #e8e8e8;
+      border-radius: 12px;
+      font-family: 'Nunito', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: border 0.2s;
+      background: #fafafa;
+    }
+    .field input:focus { border-color: var(--orange); background: white; }
+    .field input::placeholder { color: #bbb; }
+
+    /* ── FOTO PREVIEW ── */
+    .foto-preview {
+      width: 100%;
+      border-radius: 12px;
+      display: none;
+      margin-top: 10px;
+    }
+
+    /* ── ALERTA ── */
+    .alerta {
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      display: none;
+    }
+    .alerta.ok { background: #e8f5e9; color: #2e7d32; border: 2px solid #2e7d32; }
+    .alerta.err { background: #fdecea; color: #c62828; border: 2px solid #c62828; }
+    .alerta.show { display: block; animation: fadeIn 0.3s ease; }
+
+    .spinner { text-align: center; color: #888; font-size: 13px; display: none; margin: 8px 0; }
+
+    /* ── STATS ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .stat {
+      background: var(--glass-strong);
+      border-radius: 14px;
+      padding: 14px 8px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .stat .num { font-size: 26px; font-weight: 900; }
+    .stat .lbl { font-size: 11px; color: #666; margin-top: 2px; font-weight: 600; }
+    .stat.azul .num { color: var(--blue); }
+    .stat.verde .num { color: #2e7d32; }
+    .stat.rojo .num { color: #c62828; }
+
+    /* ── TABLA ── */
+    .tabla-wrap { overflow-x: auto; border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      background: var(--blue);
+      color: white;
+      padding: 11px 12px;
+      text-align: left;
+      font-weight: 700;
+    }
+    th:first-child { border-radius: 10px 0 0 0; }
+    th:last-child { border-radius: 0 10px 0 0; }
+    td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+    tr:hover td { background: #fef6f3; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge.exitoso { background: #e8f5e9; color: #2e7d32; }
+    .badge.fallido { background: #fdecea; color: #c62828; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    /* ── FILTROS ── */
+    .filtros {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+    }
+    .filtros .field { flex: 1; min-width: 130px; margin: 0; }
+    .filtros .field input[type="date"] { padding: 11px 12px; font-size: 13px; }
+
+    /* ── FOOTER ── */
+    .footer {
+      background: var(--orange);
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: auto;
+    }
+    .footer .logo-dots-6 span { background: white; }
+    .footer-text {
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+    .footer-text span { display: block; font-weight: 400; font-size: 10px; opacity: 0.9; }
+    .footer-divider { width: 1px; height: 28px; background: rgba(255,255,255,0.4); }
+
+    /* ── LOGIN OVERLAY ── */
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+    }
+    .login-overlay .bg { position: absolute; }
+    .login-content {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .login-top {
+      padding: 40px 20px 10px;
+      display: flex;
+      justify-content: center;
+    }
+    .login-card {
+      background: rgba(255,255,255,0.75);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
+      border-radius: 24px 24px 0 0;
+      padding: 28px 24px 32px;
+      margin: 0;
+      box-shadow: 0 -8px 40px rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      margin-top: -60px;
+    }
+    .login-card .card-title { color: var(--blue); }
+    .login-footer {
+      background: var(--orange);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    canvas { display: none; }
+
+    /* ── UCOMPENSAR WATERMARK ── */
+    .ucompensar-brand {
+      text-align: center;
+      color: rgba(255,255,255,0.5);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      padding: 6px 0;
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      transform: translateY(-50%) rotate(-90deg) translateX(-120px);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- FONDO -->
+<div class="bg">
+  <div class="bg-grid">
+    <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+    <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+    <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+  </div>
+  <div class="bg-overlay"></div>
+  <div class="bg-circle bg-circle-1"></div>
+  <div class="bg-circle bg-circle-2"></div>
+  <div class="bg-circle bg-circle-3"></div>
+  <div class="ucompensar-brand">UCOMPENSAR</div>
+</div>
+
+<!-- LOGIN OVERLAY RRHH -->
+<div class="login-overlay" id="loginRRHH" style="display:none">
+  <div class="bg">
+    <div class="bg-grid">
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+    </div>
+    <div class="bg-overlay"></div>
+    <div class="bg-circle bg-circle-1"></div>
+    <div class="bg-circle bg-circle-2"></div>
+    <div class="ucompensar-brand">UCOMPENSAR</div>
+  </div>
+  <div class="login-content">
+    <div class="login-top">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:12px;width:100%">
+        <button onclick="cerrarLoginRRHH()" style="align-self:flex-start;background:rgba(255,255,255,0.2);border:none;color:white;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;padding:8px 16px;border-radius:20px;cursor:pointer;backdrop-filter:blur(10px)">← Volver</button>
+        <img src="Logocomp.png" alt="UCompensar" style="height:44px;object-fit:contain;filter:brightness(0) invert(1);margin-top:8px"/>
+        <div style="color:white;font-size:13px;font-weight:700;letter-spacing:1px;text-align:center">
+          PANEL RECURSOS HUMANOS<br>
+          <span style="font-weight:400;font-size:11px;opacity:0.8">Registro de Personal</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="login-card">
+        <div class="card-title">Iniciar Sesión</div>
+        <div class="card-sub">Ingresa tus credenciales para continuar</div>
+        <div class="field">
+          <label>Usuario</label>
+          <input type="text" id="rrhh-user" placeholder="Ingrese su usuario"/>
+        </div>
+        <div class="field">
+          <label>Contraseña</label>
+          <input type="password" id="rrhh-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter') loginRRHH()"/>
+        </div>
+        <div class="alerta err" id="rrhh-login-error">Usuario o contraseña incorrectos</div>
+        <button class="btn-primary" id="btnLoginRRHH" onclick="loginRRHH()" style="margin-top:8px">Ingresar</button>
+        <button onclick="abrirReset('rrhh')" style="width:100%;margin-top:8px;background:none;border:none;color:#4B2D8F;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline">
+          ¿Olvidaste tu contraseña?
+        </button>
+      </div>
+      <div class="login-footer">
+        <img src="Logocomp.png" alt="UCompensar" style="height:28px;object-fit:contain;filter:brightness(0) invert(1)"/>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN OVERLAY AUDITORÍA -->
+<div class="login-overlay" id="loginAuditoria" style="display:none">
+  <div class="bg">
+    <div class="bg-grid">
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+      <div class="bg-cell"></div><div class="bg-cell"></div><div class="bg-cell"></div>
+    </div>
+    <div class="bg-overlay"></div>
+    <div class="bg-circle bg-circle-1"></div>
+    <div class="bg-circle bg-circle-2"></div>
+    <div class="ucompensar-brand">UCOMPENSAR</div>
+  </div>
+  <div class="login-content">
+    <div class="login-top">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:12px;width:100%">
+        <button onclick="cerrarLoginAuditoria()" style="align-self:flex-start;background:rgba(255,255,255,0.2);border:none;color:white;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;padding:8px 16px;border-radius:20px;cursor:pointer;backdrop-filter:blur(10px)">← Volver</button>
+        <img src="Logocomp.png" alt="UCompensar" style="height:44px;object-fit:contain;filter:brightness(0) invert(1);margin-top:8px"/>
+        <div style="color:white;font-size:13px;font-weight:700;letter-spacing:1px;text-align:center">
+          PANEL DE AUDITORÍA<br>
+          <span style="font-weight:400;font-size:11px;opacity:0.8">Control y Reportes</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="login-card">
+        <div class="card-title">Acceso Administrativo</div>
+        <div class="card-sub">Solo personal autorizado</div>
+        <div class="field">
+          <label>Usuario</label>
+          <input type="text" id="aud-user" placeholder="Ingrese su usuario"/>
+        </div>
+        <div class="field">
+          <label>Contraseña</label>
+          <input type="password" id="aud-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter') loginAuditoria()"/>
+        </div>
+        <div class="alerta err" id="aud-login-error">Usuario o contraseña incorrectos</div>
+        <button class="btn-primary" onclick="loginAuditoria()" style="margin-top:8px">Ingresar</button>
+        <button onclick="abrirReset('auditoria')" style="width:100%;margin-top:8px;background:none;border:none;color:#4B2D8F;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline">
+          ¿Olvidaste tu contraseña?
+        </button>
+      </div>
+      <div class="login-footer">
+        <img src="Logocomp.png" alt="UCompensar" style="height:28px;object-fit:contain;filter:brightness(0) invert(1)"/>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RESTABLECIMIENTO -->
+<div id="modal-reset" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:white;border-radius:20px;padding:28px;width:90%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:32px">🔐</div>
+      <div style="font-size:18px;font-weight:800;color:#1A2D5A">Restablecer contraseña</div>
+    </div>
+
+    <!-- PASO 1: Ingresar correo -->
+    <div id="reset-paso1">
+      <div style="font-size:13px;color:#666;margin-bottom:16px">Ingresa tu usuario institucional y te enviaremos un código de verificación al correo registrado.</div>
+      <div class="field">
+        <label>Usuario institucional</label>
+        <input type="text" id="reset-email" placeholder="Usuario institucional"/>
+      </div>
+      <div class="alerta err" id="reset-err1"></div>
+      <div class="alerta ok" id="reset-ok1"></div>
+      <button onclick="solicitarCodigo()" class="btn-primary" style="margin-top:8px">Enviar código</button>
+      <div class="spinner" id="spinner-reset1">⏳ Enviando...</div>
+    </div>
+
+    <!-- PASO 2: Ingresar código -->
+    <div id="reset-paso2" style="display:none">
+      <div style="font-size:13px;color:#666;margin-bottom:16px">Ingresa el código de 6 dígitos que enviamos a tu correo.</div>
+      <div class="field">
+        <label>Código de verificación</label>
+        <input type="text" id="reset-codigo" placeholder="000000" maxlength="6" style="letter-spacing:8px;font-size:20px;text-align:center"/>
+      </div>
+      <div class="alerta err" id="reset-err2"></div>
+      <button onclick="verificarCodigo()" class="btn-primary" style="margin-top:8px">Verificar código</button>
+      <div class="spinner" id="spinner-reset2">⏳ Verificando...</div>
+    </div>
+
+    <!-- PASO 3: Nueva contraseña -->
+    <div id="reset-paso3" style="display:none">
+      <div style="font-size:13px;color:#666;margin-bottom:16px">Ingresa tu nueva contraseña.</div>
+      <div class="field">
+        <label>Nueva contraseña</label>
+        <input type="password" id="reset-nueva" placeholder="••••••••"/>
+      </div>
+      <div class="field">
+        <label>Confirmar contraseña</label>
+        <input type="password" id="reset-confirmar" placeholder="••••••••"/>
+      </div>
+      <div class="alerta err" id="reset-err3"></div>
+      <div class="alerta ok" id="reset-ok3"></div>
+      <button onclick="cambiarClave()" class="btn-primary" style="margin-top:8px">Guardar contraseña</button>
+      <div class="spinner" id="spinner-reset3">⏳ Guardando...</div>
+    </div>
+
+    <button onclick="cerrarReset()" style="width:100%;margin-top:12px;background:none;border:2px solid #ddd;border-radius:12px;padding:10px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;color:#888;cursor:pointer">
+      Cancelar
+    </button>
+  </div>
+</div>
+<div class="app">
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo-wrap">
+      <img src="Logocomp.png" alt="UCompensar" style="height:36px;object-fit:contain;filter:brightness(0) invert(1)"/>
+    </div>
+    <div class="app-title">Sistema Biosecurity</div>
+  </div>
+
+  <!-- NAVBAR -->
+  <div class="navbar" style="margin-top:14px">
+    <button class="nav-btn active" id="nav-acceso" onclick="setPanel('acceso')">
+      <span class="nav-icon">🔐</span>
+      <span>Acceso</span>
+    </button>
+    <button class="nav-btn" id="nav-rrhh" onclick="setPanel('rrhh')">
+      <span class="nav-icon">👥</span>
+      <span>Registro</span>
+    </button>
+    <button class="nav-btn" id="nav-auditoria" onclick="setPanel('auditoria')">
+      <span class="nav-icon">📊</span>
+      <span>Auditoría</span>
+    </button>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- PANEL ACCESO -->
+    <div class="panel active" id="panel-acceso">
+      <div class="card" style="display:flex;flex-direction:column;align-items:center">
+        <div class="card-title" style="width:100%">Control de Acceso</div>
+        <div class="card-sub" style="width:100%">Posicione su rostro en el marco y valide</div>
+        <div class="cam-wrap" style="width:100%;max-width:320px;aspect-ratio:3/4;max-height:320px">
+          <video id="video-acceso" autoplay playsinline muted></video>
+          <div class="cam-overlay"><div class="face-ring" id="faceRing"></div></div>
+          <div class="cam-status" id="camStatus">📷 Cámara lista</div>
+        </div>
+        <canvas id="canvas-acceso"></canvas>
+        <button class="btn-primary" id="btn-validar" onclick="validar()" style="margin-top:14px;max-width:320px;width:100%">
+          Validar Acceso
+        </button>
+        <div class="spinner" id="spinner-acceso">⏳ Verificando identidad...</div>
+        <div class="resultado" id="resultado-acceso" style="width:100%;max-width:320px"></div>
+      </div>
+    </div>
+
+    <!-- PANEL RRHH -->
+    <div class="panel" id="panel-rrhh">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <div>
+            <div class="card-title">Registrar Empleado</div>
+            <div class="card-sub" style="margin:0">Complete los datos y tome la foto</div>
+          </div>
+          <button onclick="logoutRRHH()" style="background:var(--blue);border:none;color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;padding:8px 16px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:6px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Cerrar sesión
+          </button>
+        </div>
+        <div class="field">
+          <label>Número de identificación</label>
+          <input type="text" id="rrhh-identificacion" placeholder="Ej: 1234567890"/>
+        </div>
+        <div class="field">
+          <label>Nombre completo</label>
+          <input type="text" id="rrhh-nombre" placeholder="Ej: Juan Pérez"/>
+        </div>
+        <div class="field">
+          <label>Foto del empleado</label>
+          <div style="display:flex;flex-direction:column;align-items:center;width:100%">
+            <div class="cam-wrap" style="width:100%;max-width:280px;max-height:220px;aspect-ratio:3/4">
+              <video id="video-rrhh" autoplay playsinline muted></video>
+            </div>
+            <canvas id="canvas-rrhh"></canvas>
+            <img class="foto-preview" id="foto-preview-rrhh" style="max-width:280px"/>
+          </div>
+        </div>
+        <button class="btn-primary" id="btn-foto-rrhh" onclick="tomarFotoRRHH()">📷 Tomar Foto</button>
+        <button class="btn-secondary" id="btn-repetir-rrhh" onclick="repetirFotoRRHH()" style="display:none;margin-top:8px">🔄 Repetir Foto</button>
+        <button class="btn-primary" id="btn-registrar" onclick="registrar()" style="display:none;margin-top:8px;background:var(--blue)">✅ Registrar Empleado</button>
+        <div class="spinner" id="spinner-rrhh">⏳ Registrando...</div>
+        <div class="alerta ok" id="alerta-rrhh-ok"></div>
+        <div class="alerta err" id="alerta-rrhh-err"></div>
+      </div>
+
+      <!-- ELIMINAR EMPLEADO -->
+      <div class="card" style="border: 2px solid #fee2e2;">
+        <div class="card-title" style="color:#c62828;margin-bottom:6px">🗑️ Eliminar Empleado</div>
+        <div class="card-sub">Busque al empleado antes de eliminar</div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <div class="field" style="flex:1;margin:0">
+            <label>Número de identificación</label>
+            <input type="text" id="eliminar-id" placeholder="Ej: 1234567890" onkeydown="if(event.key==='Enter') buscarEmpleado()"/>
+          </div>
+          <button onclick="buscarEmpleado()" style="padding:13px 16px;border:none;border-radius:12px;background:var(--blue);color:white;font-size:18px;cursor:pointer;margin-bottom:14px">🔍</button>
+        </div>
+        <div class="spinner" id="spinner-buscar">⏳ Buscando...</div>
+        <div id="empleado-encontrado" style="display:none;margin-top:10px;padding:16px;background:#fff3e0;border-radius:12px;border:2px solid #FF9800">
+          <div style="font-size:13px;color:#888;margin-bottom:4px">Empleado encontrado:</div>
+          <div style="font-size:17px;font-weight:800;color:var(--blue)" id="empleado-nombre-preview"></div>
+          <div style="font-size:13px;color:#666;margin-top:2px" id="empleado-id-preview"></div>
+          <div style="font-size:12px;color:#888;margin-top:2px" id="empleado-fecha-preview"></div>
+          <div style="margin-top:14px;padding:10px;background:#fdecea;border-radius:8px;font-size:13px;color:#c62828;font-weight:600">
+            ⚠️ Esta acción eliminará al empleado del sistema y no se puede deshacer
+          </div>
+          <button onclick="confirmarEliminar()" style="width:100%;margin-top:12px;padding:13px;border:none;border-radius:12px;background:#c62828;color:white;font-family:'Nunito',sans-serif;font-size:15px;font-weight:700;cursor:pointer">
+            ✅ Confirmar Eliminación
+          </button>
+          <button onclick="cancelarEliminar()" style="width:100%;margin-top:8px;padding:11px;border:2px solid #888;border-radius:12px;background:transparent;color:#666;font-family:'Nunito',sans-serif;font-size:14px;font-weight:700;cursor:pointer">
+            Cancelar
+          </button>
+        </div>
+        <div class="spinner" id="spinner-eliminar">⏳ Eliminando...</div>
+        <div class="alerta ok" id="alerta-eliminar-ok"></div>
+        <div class="alerta err" id="alerta-eliminar-err"></div>
+      </div>
+
+      <!-- TRABAJADORES ACTIVOS -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="card-title" style="margin:0;color:#2e7d32">👥 Trabajadores Activos</div>
+            <div style="font-size:12px;color:#888;margin-top:2px" id="count-activos">—</div>
+          </div>
+          <button onclick="toggleActivos()" id="btn-activos" style="background:var(--blue);border:none;color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;padding:8px 14px;border-radius:20px;cursor:pointer">
+            Ver todos
+          </button>
+        </div>
+        <div class="spinner" id="spinner-activos">⏳ Cargando...</div>
+        <div id="lista-activos" style="display:none"></div>
+      </div>
+
+      <!-- TRABAJADORES RETIRADOS -->
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div class="card-title" style="margin:0;color:#c62828">🚪 Trabajadores Retirados</div>
+            <div style="font-size:12px;color:#888;margin-top:2px" id="count-retirados">—</div>
+          </div>
+          <button onclick="toggleRetirados()" id="btn-retirados" style="background:#c62828;border:none;color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;padding:8px 14px;border-radius:20px;cursor:pointer">
+            Ver todos
+          </button>
+        </div>
+        <div class="spinner" id="spinner-retirados">⏳ Cargando...</div>
+        <div id="lista-retirados" style="display:none"></div>
+      </div>
+
+      <!-- GESTIÓN DE USUARIOS -->
+      <div class="card" style="border:2px solid #e8e0ff">
+        <div class="card-title" style="color:#4B2D8F;margin-bottom:6px">👤 Gestión de Usuarios</div>
+        <div class="card-sub">Administra los usuarios con acceso al sistema</div>
+
+        <!-- Crear usuario -->
+        <div style="margin-top:14px">
+          <div style="font-size:13px;font-weight:700;color:#1A2D5A;margin-bottom:10px">➕ Crear nuevo usuario</div>
+          <div class="field">
+            <label>Usuario institucional</label>
+            <input type="text" id="nuevo-usuario" placeholder="Ej: jperez"/>
+          </div>
+          <div class="field">
+            <label>Correo electrónico (para recuperación)</label>
+            <input type="email" id="nuevo-correo" placeholder="correo@ejemplo.com"/>
+          </div>
+          <div class="field">
+            <label>Contraseña</label>
+            <input type="password" id="nuevo-pass" placeholder="••••••••"/>
+          </div>
+          <div class="field">
+            <label>Confirmar contraseña</label>
+            <input type="password" id="nuevo-pass-confirm" placeholder="••••••••"/>
+          </div>
+          <div class="alerta err" id="alerta-crear-err"></div>
+          <div class="alerta ok"  id="alerta-crear-ok"></div>
+          <button onclick="crearUsuario()" class="btn-primary" style="margin-top:4px">Crear usuario</button>
+          <div class="spinner" id="spinner-crear">⏳ Creando...</div>
+        </div>
+
+        <!-- Lista de usuarios -->
+        <div style="margin-top:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div style="font-size:13px;font-weight:700;color:#1A2D5A">👥 Usuarios registrados</div>
+            <button onclick="cargarUsuarios()" style="background:var(--blue);border:none;color:white;font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;padding:6px 12px;border-radius:16px;cursor:pointer">
+              Actualizar
+            </button>
+          </div>
+          <div class="spinner" id="spinner-usuarios">⏳ Cargando...</div>
+          <div id="lista-usuarios"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL AUDITORÍA -->
+    <div class="panel" id="panel-auditoria">
+      <div class="stats">
+        <div class="stat azul">
+          <div class="num" id="stat-total">0</div>
+          <div class="lbl">Total</div>
+        </div>
+        <div class="stat verde">
+          <div class="num" id="stat-exitosos">0</div>
+          <div class="lbl">Con salida</div>
+        </div>
+        <div class="stat rojo">
+          <div class="num" id="stat-fallidos">0</div>
+          <div class="lbl">Sin salida</div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div class="card-title" style="margin:0">Registro de Accesos</div>
+          <button onclick="logoutAuditoria()" style="background:var(--blue);border:none;color:white;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;padding:8px 16px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:6px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Cerrar sesión
+          </button>
+        </div>
+        <div class="filtros" style="margin-bottom:14px">
+          <div class="field">
+            <label>Desde</label>
+            <input type="date" id="fecha-desde"/>
+          </div>
+          <div class="field">
+            <label>Hasta</label>
+            <input type="date" id="fecha-hasta"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="btn-primary" onclick="cargarAuditoria()" style="flex:1;padding:12px;font-size:13px">🔍 Buscar</button>
+          <button class="btn-primary" onclick="exportarCSV()" style="flex:1;padding:12px;font-size:13px;background:var(--blue)">⬇️ Exportar</button>
+        </div>
+        <div class="spinner" id="spinner-auditoria">⏳ Cargando...</div>
+        <div class="tabla-wrap" id="tabla-auditoria">
+          <div class="empty-state">Presione Buscar para cargar los registros</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <img src="Logocomp.png" alt="UCompensar" style="height:30px;object-fit:contain;filter:brightness(0) invert(1)"/>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG ──
+  const API_VALIDAR   = "https://9bm7r0q9wi.execute-api.us-east-1.amazonaws.com/best/validar";
+  const API_RRHH_URL  = "https://uadjcukyx1.execute-api.us-east-1.amazonaws.com/prod/registrar";
+  const API_AUDITORIA = "https://3tqg18yo1l.execute-api.us-east-1.amazonaws.com/prod/reporte";
+  const API_RESET     = "https://0geuesizya.execute-api.us-east-1.amazonaws.com/prod/reset";
+  const API_KEY_RRHH  = "UBsklq8EyX8pPI2W2sHIp39gxALuSAGv7posYBGW";
+  const API_KEY_AUD   = "XYyh4xXyyka10J27CVIaA4UiKpjDW37a4lepAX1n";
+
+  // ── USUARIOS ──
+  const USUARIOS = [
+    { user: "dfguatibonza", pass: "clave123", rol: ["rrhh", "auditoria"] }
+  ];
+
+  let panelActual = "acceso";
+  let rrhhLogueado = false;
+  let audLogueado = false;
+  let fotoRRHH = null;
+  let datosAuditoria = [];
+
+  // ── NAVEGACIÓN ──
+  function setPanel(panel) {
+    if (panel === "rrhh" && !rrhhLogueado) {
+      document.getElementById("loginRRHH").style.display = "flex";
+      return;
+    }
+    if (panel === "auditoria" && !audLogueado) {
+      document.getElementById("loginAuditoria").style.display = "flex";
+      return;
+    }
+    panelActual = panel;
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+    document.getElementById("panel-" + panel).classList.add("active");
+    document.getElementById("nav-" + panel).classList.add("active");
+    if (panel === "acceso") iniciarCamaraAcceso();
+    if (panel === "rrhh") iniciarCamaraRRHH();
+    if (panel === "auditoria") { setFechasHoy(); cargarAuditoria(); }
+  }
+
+  // ── LOGINS ──
+  function cerrarLoginRRHH() {
+    document.getElementById("loginRRHH").style.display = "none";
+    document.getElementById("rrhh-pass").value = "";
+    document.getElementById("rrhh-login-error").classList.remove("show");
+  }
+
+  function cerrarLoginAuditoria() {
+    document.getElementById("loginAuditoria").style.display = "none";
+    document.getElementById("aud-pass").value = "";
+    document.getElementById("aud-login-error").classList.remove("show");
+  }
+
+  async function loginRRHH() {
+    const user = document.getElementById("rrhh-user").value.trim();
+    const pass = document.getElementById("rrhh-pass").value;
+    const err  = document.getElementById("rrhh-login-error");
+    const btn  = document.getElementById("btnLoginRRHH");
+
+    btn.disabled = true;
+    btn.textContent = "Verificando...";
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "login", email: user, clave: pass })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0 && body.rol.includes("rrhh")) {
+        rrhhLogueado = true;
+        usuarioActual = user;
+        document.getElementById("loginRRHH").style.display = "none";
+        setPanel("rrhh");
+        setTimeout(cargarUsuarios, 500);
+      } else {
+        err.classList.add("show");
+        setTimeout(() => err.classList.remove("show"), 3000);
+      }
+    } catch(e) {
+      err.classList.add("show");
+      setTimeout(() => err.classList.remove("show"), 3000);
+    }
+    btn.disabled = false;
+    btn.textContent = "Ingresar";
+  }
+
+  async function loginAuditoria() {
+    const user = document.getElementById("aud-user").value.trim();
+    const pass = document.getElementById("aud-pass").value;
+    const err  = document.getElementById("aud-login-error");
+    const btn  = document.querySelector("#loginAuditoria .btn-primary");
+
+    if (btn) { btn.disabled = true; btn.textContent = "Verificando..."; }
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "login", email: user, clave: pass })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0 && body.rol.includes("auditoria")) {
+        audLogueado = true;
+        usuarioActual = user;
+        document.getElementById("loginAuditoria").style.display = "none";
+        setPanel("auditoria");
+      } else {
+        err.innerHTML = "Usuario o contraseña incorrectos";
+        err.classList.add("show");
+        setTimeout(() => err.classList.remove("show"), 3000);
+      }
+    } catch(e) {
+      err.innerHTML = "⚠️ Error de conexión";
+      err.classList.add("show");
+      setTimeout(() => err.classList.remove("show"), 3000);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = "Ingresar"; }
+  }
+
+  function logoutRRHH() {
+    rrhhLogueado = false;
+    document.getElementById("rrhh-pass").value = "";
+    setPanel("acceso");
+  }
+
+  function logoutAuditoria() {
+    audLogueado = false;
+    document.getElementById("aud-pass").value = "";
+    document.getElementById("aud-user").value = "";
+    setPanel("acceso");
+  }
+
+  // ── AUDIOS ──
+  const audioSuccess = new Audio("https://d2oixn9k6l57iy.cloudfront.net/success.mp3");
+  const audioError   = new Audio("https://d2oixn9k6l57iy.cloudfront.net/error.mp3");
+  function playSuccess() { audioSuccess.currentTime = 0; audioSuccess.play().catch(()=>{}); }
+  function playError()   { audioError.currentTime = 0;   audioError.play().catch(()=>{}); }
+
+  // ── CÁMARA ACCESO ──
+  function iniciarCamaraAcceso() {
+    const video = document.getElementById("video-acceso");
+    if (video.srcObject) return;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then(s => { video.srcObject = s; document.getElementById("camStatus").textContent = "📷 Cámara lista"; })
+      .catch(() => document.getElementById("camStatus").textContent = "❌ Sin acceso a cámara");
+  }
+
+  // ── VALIDAR ──
+  async function validar() {
+    const btn     = document.getElementById("btn-validar");
+    const spinner = document.getElementById("spinner-acceso");
+    const res     = document.getElementById("resultado-acceso");
+    const video   = document.getElementById("video-acceso");
+    const canvas  = document.getElementById("canvas-acceso");
+
+    btn.disabled = true;
+    spinner.style.display = "block";
+    res.className = "resultado";
+
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    const img = canvas.toDataURL("image/jpeg", 0.8);
+
+    try {
+      const r = await fetch(API_VALIDAR, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imgvalidacion: img })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      res.classList.add("show");
+      if (body.codigo === 0) {
+        playSuccess();
+        const icono  = body.tipo_acceso === "ENTRADA" ? "🟢" : "🔴";
+        const tipo   = body.tipo_acceso === "ENTRADA" ? "Entrada registrada" : "Salida registrada";
+        const saludo = body.tipo_acceso === "ENTRADA" ? "¡Bienvenido!" : "¡Hasta luego!";
+        const nombre = body.nombre || body.similutud;
+        res.className = "resultado exito show";
+        res.innerHTML = `${icono} ${saludo}<br>
+          <span style="font-size:17px;font-weight:800">${nombre}</span><br>
+          <small style="font-weight:600;opacity:0.8">${tipo} · ${new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}</small>`;
+      } else {
+        playError();
+        res.className = "resultado error show";
+        res.innerHTML = "❌ Acceso Denegado<br><small style=\"font-weight:400\">Rostro no reconocido</small>";
+      }
+    } catch(e) {
+      playError();
+      res.className = "resultado error show";
+      res.innerHTML = "⚠️ Sin conexión a internet";
+    }
+
+    spinner.style.display = "none";
+    btn.disabled = false;
+    setTimeout(() => { res.className = "resultado"; }, 6000);
+  }
+
+  // ── CÁMARA RRHH ──
+  function iniciarCamaraRRHH() {
+    const video = document.getElementById("video-rrhh");
+    if (video.srcObject) return;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then(s => { video.srcObject = s; })
+      .catch(() => {});
+  }
+
+  function tomarFotoRRHH() {
+    const video  = document.getElementById("video-rrhh");
+    const canvas = document.getElementById("canvas-rrhh");
+    const preview = document.getElementById("foto-preview-rrhh");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    fotoRRHH = canvas.toDataURL("image/jpeg", 0.85);
+    preview.src = fotoRRHH;
+    preview.style.display = "block";
+    video.style.display = "none";
+    document.getElementById("btn-foto-rrhh").style.display = "none";
+    document.getElementById("btn-repetir-rrhh").style.display = "block";
+    document.getElementById("btn-registrar").style.display = "block";
+  }
+
+  function repetirFotoRRHH() {
+    fotoRRHH = null;
+    document.getElementById("foto-preview-rrhh").style.display = "none";
+    document.getElementById("video-rrhh").style.display = "block";
+    document.getElementById("btn-foto-rrhh").style.display = "block";
+    document.getElementById("btn-repetir-rrhh").style.display = "none";
+    document.getElementById("btn-registrar").style.display = "none";
+  }
+
+  async function registrar() {
+    const id     = document.getElementById("rrhh-identificacion").value.trim();
+    const nombre = document.getElementById("rrhh-nombre").value.trim();
+    const ok     = document.getElementById("alerta-rrhh-ok");
+    const err    = document.getElementById("alerta-rrhh-err");
+    const spinner = document.getElementById("spinner-rrhh");
+    const btn    = document.getElementById("btn-registrar");
+
+    if (!id || !nombre || !fotoRRHH) {
+      mostrarAlerta(err, "Complete todos los campos y tome la foto"); return;
+    }
+    spinner.style.display = "block";
+    btn.disabled = true;
+    ok.classList.remove("show"); err.classList.remove("show");
+
+    try {
+      const r = await fetch(API_RRHH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY_RRHH },
+        body: JSON.stringify({ identificacion: id, nombre, foto: fotoRRHH })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+      if (body.codigo === 0) {
+        playSuccess();
+        mostrarAlerta(ok, `✅ ${body.nombre} registrado exitosamente`);
+        document.getElementById("rrhh-identificacion").value = "";
+        document.getElementById("rrhh-nombre").value = "";
+        repetirFotoRRHH();
+      } else {
+        playError();
+        mostrarAlerta(err, body.descripcion || "Error al registrar");
+      }
+    } catch(e) {
+      playError();
+      mostrarAlerta(err, "⚠️ Sin conexión a internet");
+    }
+    spinner.style.display = "none";
+    btn.disabled = false;
+  }
+
+  function mostrarAlerta(el, msg) {
+    el.textContent = msg;
+    el.classList.add("show");
+    setTimeout(() => el.classList.remove("show"), 5000);
+  }
+
+  async function buscarEmpleado() {
+    const id      = document.getElementById("eliminar-id").value.trim();
+    const spinner = document.getElementById("spinner-buscar");
+    const found   = document.getElementById("empleado-encontrado");
+    const err     = document.getElementById("alerta-eliminar-err");
+
+    if (!id) { mostrarAlerta(err, "Ingrese el número de identificación"); return; }
+
+    found.style.display = "none";
+    err.classList.remove("show");
+    spinner.style.display = "block";
+
+    try {
+      // Usamos GET al endpoint de registro para buscar por ID
+      const r = await fetch(`${API_RRHH_URL}?identificacion=${id}`, {
+        method: "GET",
+        headers: { "x-api-key": API_KEY_RRHH }
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0 && body.nombre) {
+        document.getElementById("empleado-nombre-preview").textContent = body.nombre;
+        document.getElementById("empleado-id-preview").textContent = `Cédula: ${id}`;
+        document.getElementById("empleado-fecha-preview").textContent = body.fecha_registro ? `Registrado: ${new Date(body.fecha_registro).toLocaleDateString("es-CO")}` : "";
+        found.style.display = "block";
+      } else {
+        mostrarAlerta(err, "No se encontró ningún empleado con esa identificación");
+      }
+    } catch(e) {
+      mostrarAlerta(err, "⚠️ Error de conexión");
+    }
+    spinner.style.display = "none";
+  }
+
+  function cancelarEliminar() {
+    document.getElementById("empleado-encontrado").style.display = "none";
+    document.getElementById("eliminar-id").value = "";
+  }
+
+  async function confirmarEliminar() {
+    const id      = document.getElementById("eliminar-id").value.trim();
+    const ok      = document.getElementById("alerta-eliminar-ok");
+    const err     = document.getElementById("alerta-eliminar-err");
+    const spinner = document.getElementById("spinner-eliminar");
+    const found   = document.getElementById("empleado-encontrado");
+
+    spinner.style.display = "block";
+    found.style.display = "none";
+
+    try {
+      const r = await fetch(API_RRHH_URL, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "x-api-key": API_KEY_RRHH },
+        body: JSON.stringify({ identificacion: id })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0) {
+        mostrarAlerta(ok, `✅ ${body.descripcion}`);
+        document.getElementById("eliminar-id").value = "";
+      } else {
+        mostrarAlerta(err, body.descripcion || "Error al eliminar");
+      }
+    } catch(e) {
+      mostrarAlerta(err, "⚠️ Error de conexión");
+    }
+    spinner.style.display = "none";
+  }
+
+  async function eliminarEmpleado() { buscarEmpleado(); }
+
+  // ── TRABAJADORES ACTIVOS Y RETIRADOS ──
+  let activosCargados = false;
+  let retiradosCargados = false;
+
+  async function toggleActivos() {
+    const lista = document.getElementById("lista-activos");
+    const btn   = document.getElementById("btn-activos");
+    const spinner = document.getElementById("spinner-activos");
+
+    if (lista.style.display === "block") {
+      lista.style.display = "none";
+      btn.textContent = "Ver todos";
+      return;
+    }
+
+    spinner.style.display = "block";
+    btn.textContent = "Ocultar";
+
+    try {
+      const r = await fetch(API_RRHH_URL + "?tipo=activos", {
+        headers: { "x-api-key": API_KEY_RRHH }
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+      const items = body.items || [];
+
+      document.getElementById("count-activos").textContent = `${items.length} empleado${items.length !== 1 ? "s" : ""} activo${items.length !== 1 ? "s" : ""}`;
+
+      if (!items.length) {
+        lista.innerHTML = '<div class="empty-state">No hay empleados activos</div>';
+      } else {
+        lista.innerHTML = items.map(e => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0">
+            <div>
+              <div style="font-weight:800;color:var(--blue);font-size:14px">${e.nombre}</div>
+              <div style="font-size:12px;color:#888">CC: ${e.identificacion}</div>
+              <div style="font-size:11px;color:#aaa">Registrado: ${e.fecha_registro ? new Date(e.fecha_registro).toLocaleDateString("es-CO") : "—"}</div>
+            </div>
+            <div style="width:10px;height:10px;background:#2e7d32;border-radius:50%"></div>
+          </div>`).join("");
+      }
+      lista.style.display = "block";
+    } catch(e) {
+      lista.innerHTML = '<div class="empty-state">⚠️ Error de conexión</div>';
+      lista.style.display = "block";
+    }
+    spinner.style.display = "none";
+  }
+
+  async function toggleRetirados() {
+    const lista = document.getElementById("lista-retirados");
+    const btn   = document.getElementById("btn-retirados");
+    const spinner = document.getElementById("spinner-retirados");
+
+    if (lista.style.display === "block") {
+      lista.style.display = "none";
+      btn.textContent = "Ver todos";
+      return;
+    }
+
+    spinner.style.display = "block";
+    btn.textContent = "Ocultar";
+
+    try {
+      const r = await fetch(API_RRHH_URL + "?tipo=retirados", {
+        headers: { "x-api-key": API_KEY_RRHH }
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+      const items = body.items || [];
+
+      document.getElementById("count-retirados").textContent = `${items.length} empleado${items.length !== 1 ? "s" : ""} retirado${items.length !== 1 ? "s" : ""}`;
+
+      if (!items.length) {
+        lista.innerHTML = '<div class="empty-state">No hay empleados retirados</div>';
+      } else {
+        lista.innerHTML = items.map(e => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f0f0f0">
+            <div>
+              <div style="font-weight:800;color:#c62828;font-size:14px">${e.nombre}</div>
+              <div style="font-size:12px;color:#888">CC: ${e.identificacion}</div>
+              <div style="font-size:11px;color:#aaa">Ingresó: ${e.fecha_registro ? new Date(e.fecha_registro).toLocaleDateString("es-CO") : "—"}</div>
+              <div style="font-size:11px;color:#e57373;font-weight:600">Retirado: ${e.fecha_retiro ? new Date(e.fecha_retiro).toLocaleDateString("es-CO") : "—"}</div>
+            </div>
+            <div style="width:10px;height:10px;background:#c62828;border-radius:50%"></div>
+          </div>`).join("");
+      }
+      lista.style.display = "block";
+    } catch(e) {
+      lista.innerHTML = '<div class="empty-state">⚠️ Error de conexión</div>';
+      lista.style.display = "block";
+    }
+    spinner.style.display = "none";
+  }
+
+  // ── AUDITORÍA ──
+  function setFechasHoy() {
+    const hoy = new Date().toISOString().split("T")[0];
+    const hace30 = new Date(Date.now() - 30*24*60*60*1000).toISOString().split("T")[0];
+    document.getElementById("fecha-desde").value = hace30;
+    document.getElementById("fecha-hasta").value = hoy;
+  }
+
+  async function cargarAuditoria() {
+    const spinner = document.getElementById("spinner-auditoria");
+    const tabla   = document.getElementById("tabla-auditoria");
+    spinner.style.display = "block";
+    tabla.innerHTML = "";
+
+    try {
+      const r = await fetch(API_AUDITORIA + "?format=json", {
+        headers: { "x-api-key": API_KEY_AUD }
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+      datosAuditoria = body.items || [];
+      renderTabla(datosAuditoria);
+    } catch(e) {
+      tabla.innerHTML = '<div class="empty-state">⚠️ Error de conexión</div>';
+    }
+    spinner.style.display = "none";
+  }
+
+  function renderTabla(items) {
+    const desde = document.getElementById("fecha-desde").value;
+    const hasta = document.getElementById("fecha-hasta").value;
+    const filtrados = items.filter(i => {
+      const f = i.fecha || (i.hora_entrada ? i.hora_entrada.split("T")[0] : "");
+      if (!f) return true;
+      return (!desde || f >= desde) && (!hasta || f <= hasta);
+    }).sort((a,b) => (b.hora_entrada||b.fecha||"").localeCompare(a.hora_entrada||a.fecha||""));
+
+    document.getElementById("stat-total").textContent = filtrados.length;
+    document.getElementById("stat-exitosos").textContent = filtrados.filter(i => i.hora_salida).length;
+    document.getElementById("stat-fallidos").textContent = filtrados.filter(i => !i.hora_salida).length;
+
+    const tabla = document.getElementById("tabla-auditoria");
+    if (!filtrados.length) {
+      tabla.innerHTML = '<div class="empty-state">No hay registros en este período</div>';
+      return;
+    }
+
+    tabla.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Identificación</th><th>Nombre</th><th>Entrada</th><th>Salida</th>
+        </tr></thead>
+        <tbody>${filtrados.map(i => `
+          <tr>
+            <td style="font-weight:700">${i.identificacion||"-"}</td>
+            <td>${i.nombre||"-"}</td>
+            <td style="color:#2e7d32;font-weight:600">${i.hora_entrada ? formatHora(i.hora_entrada) : "-"}</td>
+            <td style="color:#c62828;font-weight:600">${i.hora_salida  ? formatHora(i.hora_salida)  : "<span style='color:#888;font-weight:400'>Sin salida</span>"}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>`;
+  }
+
+  function formatFecha(iso) {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-CO",{day:"2-digit",month:"2-digit"}) + " " +
+           d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+  }
+
+  function formatHora(iso) {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    return d.toLocaleDateString("es-CO",{day:"2-digit",month:"2-digit"}) + " " +
+           d.toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+  }
+
+  function exportarCSV() {
+    if (!datosAuditoria.length) { alert("No hay datos. Presione Buscar primero."); return; }
+    const headers = ["Identificacion", "Nombre", "Fecha Entrada", "Hora Entrada", "Fecha Salida", "Hora Salida"];
+    const rows = datosAuditoria.map(i => {
+      const entrada = i.hora_entrada ? new Date(i.hora_entrada) : null;
+      const salida  = i.hora_salida  ? new Date(i.hora_salida)  : null;
+      return [
+        i.identificacion || "",
+        i.nombre || "",
+        entrada ? entrada.toLocaleDateString("es-CO") : "",
+        entrada ? entrada.toLocaleTimeString("es-CO", {hour:"2-digit", minute:"2-digit"}) : "",
+        salida  ? salida.toLocaleDateString("es-CO")  : "",
+        salida  ? salida.toLocaleTimeString("es-CO",  {hour:"2-digit", minute:"2-digit"}) : "Sin salida"
+      ];
+    });
+    const csv = [headers,...rows].map(r => r.map(v=>`"${v}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `accesos_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+  }
+
+  // ── GESTIÓN DE USUARIOS ──
+  let usuarioActual = "";
+
+  async function crearUsuario() {
+    const usuario  = document.getElementById("nuevo-usuario").value.trim();
+    const correo   = document.getElementById("nuevo-correo").value.trim();
+    const pass     = document.getElementById("nuevo-pass").value;
+    const confirm  = document.getElementById("nuevo-pass-confirm").value;
+    const ok       = document.getElementById("alerta-crear-ok");
+    const err      = document.getElementById("alerta-crear-err");
+    const spinner  = document.getElementById("spinner-crear");
+
+    if (!usuario || !correo || !pass) { mostrarAlerta(err, "Complete todos los campos"); return; }
+    if (pass !== confirm) { mostrarAlerta(err, "Las contraseñas no coinciden"); return; }
+    if (pass.length < 6) { mostrarAlerta(err, "La contraseña debe tener al menos 6 caracteres"); return; }
+
+    spinner.style.display = "block";
+    ok.classList.remove("show"); err.classList.remove("show");
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "crear_usuario", usuario, correo, clave: pass })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0) {
+        playSuccess();
+        mostrarAlerta(ok, `✅ ${body.descripcion}`);
+        document.getElementById("nuevo-usuario").value = "";
+        document.getElementById("nuevo-correo").value = "";
+        document.getElementById("nuevo-pass").value = "";
+        document.getElementById("nuevo-pass-confirm").value = "";
+        cargarUsuarios();
+      } else {
+        playError();
+        mostrarAlerta(err, body.descripcion || "Error al crear usuario");
+      }
+    } catch(e) {
+      playError();
+      mostrarAlerta(err, "⚠️ Error de conexión");
+    }
+    spinner.style.display = "none";
+  }
+
+  async function eliminarUsuario(usuario) {
+    if (!confirm(`¿Eliminar el usuario "${usuario}"? Esta acción no se puede deshacer.`)) return;
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "eliminar_usuario", usuario, usuario_actual: usuarioActual })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0) {
+        playSuccess();
+        cargarUsuarios();
+      } else {
+        playError();
+        alert(body.descripcion || "Error al eliminar usuario");
+      }
+    } catch(e) {
+      alert("⚠️ Error de conexión");
+    }
+  }
+
+  async function cargarUsuarios() {
+    const spinner = document.getElementById("spinner-usuarios");
+    const lista   = document.getElementById("lista-usuarios");
+    spinner.style.display = "block";
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "listar_usuarios" })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+      const items = body.items || [];
+
+      if (!items.length) {
+        lista.innerHTML = '<div class="empty-state">No hay usuarios registrados</div>';
+      } else {
+        lista.innerHTML = items.map(u => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0f0f0">
+            <div>
+              <div style="font-weight:800;color:#1A2D5A;font-size:14px">${u.usuario}</div>
+              <div style="font-size:12px;color:#888">${u.correo || "Sin correo registrado"}</div>
+            </div>
+            ${u.usuario !== usuarioActual ? `
+            <button onclick="eliminarUsuario('${u.usuario}')" style="background:#fdecea;border:none;color:#c62828;font-family:'Nunito',sans-serif;font-size:11px;font-weight:700;padding:6px 12px;border-radius:16px;cursor:pointer">
+              🗑️ Eliminar
+            </button>` : `<span style="font-size:11px;color:#888;font-style:italic">Tú</span>`}
+          </div>`).join("");
+      }
+    } catch(e) {
+      lista.innerHTML = '<div class="empty-state">⚠️ Error de conexión</div>';
+    }
+    spinner.style.display = "none";
+  }
+
+  // ── RESTABLECIMIENTO DE CONTRASEÑA ──
+  let resetEmail = "";
+  let resetCodigo = "";
+  let resetOrigen = "";
+
+  function abrirReset(origen) {
+    resetOrigen = origen;
+    resetEmail = "";
+    resetCodigo = "";
+    document.getElementById("reset-email").value = "";
+    document.getElementById("reset-codigo").value = "";
+    document.getElementById("reset-nueva").value = "";
+    document.getElementById("reset-confirmar").value = "";
+    document.getElementById("reset-paso1").style.display = "block";
+    document.getElementById("reset-paso2").style.display = "none";
+    document.getElementById("reset-paso3").style.display = "none";
+    document.getElementById("reset-err1").classList.remove("show");
+    document.getElementById("reset-ok1").classList.remove("show");
+    const modal = document.getElementById("modal-reset");
+    modal.style.display = "flex";
+  }
+
+  function cerrarReset() {
+    document.getElementById("modal-reset").style.display = "none";
+  }
+
+  async function solicitarCodigo() {
+    const email   = document.getElementById("reset-email").value.trim();
+    const err     = document.getElementById("reset-err1");
+    const ok      = document.getElementById("reset-ok1");
+    const spinner = document.getElementById("spinner-reset1");
+
+    if (!email) { mostrarAlerta(err, "Ingresa tu correo"); return; }
+
+    spinner.style.display = "block";
+    err.classList.remove("show");
+    ok.classList.remove("show");
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "solicitar", email })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0) {
+        resetEmail = email;
+        mostrarAlerta(ok, "✅ Código enviado a tu correo");
+        setTimeout(() => {
+          document.getElementById("reset-paso1").style.display = "none";
+          document.getElementById("reset-paso2").style.display = "block";
+        }, 1500);
+      } else {
+        mostrarAlerta(err, body.descripcion || "Error al enviar código");
+      }
+    } catch(e) {
+      mostrarAlerta(err, "⚠️ Error de conexión");
+    }
+    spinner.style.display = "none";
+  }
+
+  async function verificarCodigo() {
+    const codigo  = document.getElementById("reset-codigo").value.trim();
+    const err     = document.getElementById("reset-err2");
+    const spinner = document.getElementById("spinner-reset2");
+
+    if (!codigo || codigo.length !== 6) { mostrarAlerta(err, "Ingresa el código de 6 dígitos"); return; }
+
+    spinner.style.display = "block";
+    err.classList.remove("show");
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "verificar", email: resetEmail, codigo })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0) {
+        resetCodigo = codigo;
+        document.getElementById("reset-paso2").style.display = "none";
+        document.getElementById("reset-paso3").style.display = "block";
+      } else {
+        mostrarAlerta(err, body.descripcion || "Código incorrecto");
+      }
+    } catch(e) {
+      mostrarAlerta(err, "⚠️ Error de conexión");
+    }
+    spinner.style.display = "none";
+  }
+
+  async function cambiarClave() {
+    const nueva     = document.getElementById("reset-nueva").value;
+    const confirmar = document.getElementById("reset-confirmar").value;
+    const err       = document.getElementById("reset-err3");
+    const ok        = document.getElementById("reset-ok3");
+    const spinner   = document.getElementById("spinner-reset3");
+
+    if (!nueva || nueva.length < 6) { mostrarAlerta(err, "La contraseña debe tener al menos 6 caracteres"); return; }
+    if (nueva !== confirmar) { mostrarAlerta(err, "Las contraseñas no coinciden"); return; }
+
+    spinner.style.display = "block";
+    err.classList.remove("show");
+
+    try {
+      const r = await fetch(API_RESET, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accion: "cambiar", email: resetEmail, codigo: resetCodigo, nueva_clave: nueva })
+      });
+      const data = await r.json();
+      const body = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+      if (body.codigo === 0) {
+        // Actualizar contraseña en memoria
+        const usuario = USUARIOS.find(u => u.user === resetEmail);
+        if (usuario) usuario.pass = nueva;
+        mostrarAlerta(ok, "✅ Contraseña actualizada. Ya puedes iniciar sesión.");
+        setTimeout(() => cerrarReset(), 2500);
+      } else {
+        mostrarAlerta(err, body.descripcion || "Error al cambiar contraseña");
+      }
+    } catch(e) {
+      mostrarAlerta(err, "⚠️ Error de conexión");
+    }
+    spinner.style.display = "none";
+  }
+
+  // ── INIT ──
+  window.addEventListener("load", () => {
+    iniciarCamaraAcceso();
+  });
+</script>
+</body>
+</html>
