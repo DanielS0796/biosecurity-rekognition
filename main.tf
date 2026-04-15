@@ -660,3 +660,164 @@ output "kms_key_id" {
   value       = aws_kms_key.biosecurity.key_id
   description = "ID de la llave KMS"
 }
+
+# ─────────────────────────────────────────
+# DynamoDB - Reset codes y usuarios
+# ─────────────────────────────────────────
+resource "aws_dynamodb_table" "reset_codes" {
+  name         = "biosecurity-reset-codes"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "email"
+  attribute {
+    name = "email"
+    type = "S"
+  }
+  tags = { Project = "anlusoft-rekognition" }
+}
+
+resource "aws_dynamodb_table" "usuarios" {
+  name         = "biosecurity-usuarios"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "email"
+  attribute {
+    name = "email"
+    type = "S"
+  }
+  tags = { Project = "anlusoft-rekognition" }
+}
+
+# ─────────────────────────────────────────
+# IAM - Política reset (DynamoDB + Gmail SMTP)
+# ─────────────────────────────────────────
+resource "aws_iam_role_policy" "lambda_reset_policy" {
+  name = "biosecurity-reset-policy"
+  role = aws_iam_role.lambda_role.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          aws_dynamodb_table.reset_codes.arn,
+          aws_dynamodb_table.usuarios.arn
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["ses:SendEmail", "ses:SendRawEmail", "ses:VerifyEmailIdentity"]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# ─────────────────────────────────────────
+# Lambda reset
+# ─────────────────────────────────────────
+resource "aws_lambda_function" "reset" {
+  function_name = "biosecurity-reset"
+  filename      = "${path.module}/lambda_build/reset.zip"
+  handler       = "reset.handler"
+  runtime       = "nodejs22.x"
+  role          = aws_iam_role.lambda_role.arn
+  timeout       = 30
+  memory_size   = 256
+  tags          = { Project = "anlusoft-rekognition" }
+}
+
+# ─────────────────────────────────────────
+# API Gateway reset (público)
+# ─────────────────────────────────────────
+resource "aws_api_gateway_rest_api" "api_reset" {
+  name        = "biosecurity-reset-api"
+  description = "API para restablecimiento de contraseña y gestión de usuarios"
+}
+
+resource "aws_api_gateway_resource" "reset_root" {
+  rest_api_id = aws_api_gateway_rest_api.api_reset.id
+  parent_id   = aws_api_gateway_rest_api.api_reset.root_resource_id
+  path_part   = "reset"
+}
+
+resource "aws_api_gateway_method" "reset_post" {
+  rest_api_id   = aws_api_gateway_rest_api.api_reset.id
+  resource_id   = aws_api_gateway_resource.reset_root.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "reset_lambda" {
+  rest_api_id             = aws_api_gateway_rest_api.api_reset.id
+  resource_id             = aws_api_gateway_resource.reset_root.id
+  http_method             = aws_api_gateway_method.reset_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.reset.invoke_arn
+}
+
+resource "aws_api_gateway_method" "reset_options" {
+  rest_api_id   = aws_api_gateway_rest_api.api_reset.id
+  resource_id   = aws_api_gateway_resource.reset_root.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "reset_options" {
+  rest_api_id = aws_api_gateway_rest_api.api_reset.id
+  resource_id = aws_api_gateway_resource.reset_root.id
+  http_method = aws_api_gateway_method.reset_options.http_method
+  type        = "MOCK"
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "reset_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api_reset.id
+  resource_id = aws_api_gateway_resource.reset_root.id
+  http_method = aws_api_gateway_method.reset_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "reset_options" {
+  rest_api_id = aws_api_gateway_rest_api.api_reset.id
+  resource_id = aws_api_gateway_resource.reset_root.id
+  http_method = aws_api_gateway_method.reset_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+  depends_on = [aws_api_gateway_integration.reset_options]
+}
+
+resource "aws_api_gateway_deployment" "reset_deployment" {
+  depends_on  = [aws_api_gateway_integration.reset_lambda, aws_api_gateway_integration.reset_options]
+  rest_api_id = aws_api_gateway_rest_api.api_reset.id
+  stage_name  = "prod"
+}
+
+resource "aws_lambda_permission" "apigw_reset" {
+  statement_id  = "AllowAPIGatewayInvokeReset"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.reset.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.api_reset.execution_arn}/*/*"
+}
+
+output "api_reset_url" {
+  value       = "https://${aws_api_gateway_rest_api.api_reset.id}.execute-api.us-east-1.amazonaws.com/prod/reset"
+  description = "URL restablecimiento de contraseña y gestión de usuarios"
+}
