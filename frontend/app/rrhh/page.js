@@ -121,6 +121,11 @@ export default function RRHH() {
   function repetirFoto() {
     setFoto(null)
     setFotoTomada(false)
+    if (videoRef.current && videoRef.current.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(t => t.stop())
+      videoRef.current.srcObject = null
+    }
+    setTimeout(() => iniciarCamara(), 150)
   }
 
   async function registrar() {
