@@ -225,7 +225,7 @@ export default function RRHH() {
   }
 
   async function crearUsuario() {
-    if (!nuevoUsuario.trim() || !nuevoCorreo.trim() || !nuevoPass.trim()) { alerta(setCrearErr, 'Complete todos los campos'); return }
+    if (!nuevoUsuario || !nuevoCorreo || !nuevoPass) { alerta(setCrearErr, 'Complete todos los campos'); return }
     if (nuevoPass !== nuevoPassConfirm) { alerta(setCrearErr, 'Las contraseñas no coinciden'); return }
     if (nuevoPass.length < 6) { alerta(setCrearErr, 'La contraseña debe tener al menos 6 caracteres'); return }
     setCrearLoading(true)
@@ -233,7 +233,7 @@ export default function RRHH() {
       const r = await fetch(API_RESET, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'crear_usuario', usuario: nuevoUsuario.trim(), correo: nuevoCorreo.trim(), clave: nuevoPass.trim() })
+        body: JSON.stringify({ accion: 'crear_usuario', usuario: nuevoUsuario, correo: nuevoCorreo, clave: nuevoPass })
       })
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
