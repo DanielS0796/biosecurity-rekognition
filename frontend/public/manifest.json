@@ -1,0 +1,21 @@
+{
+  "name": "Biosecurity UCompensar",
+  "short_name": "Biosecurity",
+  "description": "Sistema de control de acceso biométrico",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#321E6B",
+  "theme_color": "#F05A22",
+  "icons": [
+    {
+      "src": "/Logocomp.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/Logocomp.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

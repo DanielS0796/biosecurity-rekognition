@@ -3,6 +3,7 @@ import './globals.css'
 export const metadata = {
   title: 'Biosecurity · UCompensar',
   description: 'Sistema de control de acceso biométrico',
+  manifest: '/manifest.json',
 }
 
 export const viewport = {
