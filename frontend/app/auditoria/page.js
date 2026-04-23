@@ -33,7 +33,7 @@ export default function Auditoria() {
       const r = await fetch(API_RESET, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'login', email: loginUser, clave: loginPass })
+        body: JSON.stringify({ accion: 'login', email: loginUser.trim(), clave: loginPass.trim() })
       })
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
