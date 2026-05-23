@@ -1,3 +1,7 @@
+// Initialize Sentry FIRST
+require("./instrument.js");
+const Sentry = require("@sentry/aws-serverless");
+
 const { RekognitionClient, IndexFacesCommand, DeleteFacesCommand, SearchFacesByImageCommand } = require("@aws-sdk/client-rekognition");
 const { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand } = require("@aws-sdk/client-dynamodb");
 const crypto = require("crypto");
@@ -11,19 +15,28 @@ const CORS = {
     "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
 };
 
-exports.handler = async (event) => {
+function log(level, message, data = {}) {
+    console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level,
+        module: process.env.MODULE_NAME || "registrar-empleado",
+        message,
+        ...data
+    }));
+}
 
-    // ── OPTIONS ──
+exports.handler = Sentry.wrapHandler(async (event) => {
+    const startTime = Date.now();
+    log("INFO", "Lambda invoked", { method: event.httpMethod });
+
     if (event.httpMethod === "OPTIONS") {
         return { statusCode: 200, headers: CORS, body: "" };
     }
 
-    // ── GET ──
     if (event.httpMethod === "GET") {
         const tipo = event.queryStringParameters?.tipo;
         const identificacion = event.queryStringParameters?.identificacion;
 
-        // Buscar empleado por ID
         if (identificacion) {
             try {
                 const empleado = await dynamo.send(new GetItemCommand({
@@ -43,11 +56,12 @@ exports.handler = async (event) => {
                     })
                 };
             } catch (error) {
+                log("ERROR", "Error buscando empleado", { error: error.message });
+                Sentry.captureException(error);
                 return { statusCode: 500, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: "Error buscando empleado" }) };
             }
         }
 
-        // Listar retirados
         if (tipo === "retirados") {
             try {
                 const result = await dynamo.send(new ScanCommand({ TableName: "biosecurity-retirados" }));
@@ -59,11 +73,12 @@ exports.handler = async (event) => {
                 })).sort((a, b) => (b.fecha_retiro || "").localeCompare(a.fecha_retiro || ""));
                 return { statusCode: 200, headers: CORS, body: JSON.stringify({ codigo: 0, items }) };
             } catch (error) {
+                log("ERROR", "Error listando retirados", { error: error.message });
+                Sentry.captureException(error);
                 return { statusCode: 500, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: "Error listando retirados" }) };
             }
         }
 
-        // Listar activos (default)
         try {
             const result = await dynamo.send(new ScanCommand({ TableName: "biosecurity-empleados" }));
             const items = (result.Items || []).map(i => ({
@@ -73,11 +88,12 @@ exports.handler = async (event) => {
             })).sort((a, b) => (b.fecha_registro || "").localeCompare(a.fecha_registro || ""));
             return { statusCode: 200, headers: CORS, body: JSON.stringify({ codigo: 0, items }) };
         } catch (error) {
+            log("ERROR", "Error listando empleados", { error: error.message });
+            Sentry.captureException(error);
             return { statusCode: 500, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: "Error listando empleados" }) };
         }
     }
 
-    // ── DELETE ──
     if (event.httpMethod === "DELETE") {
         try {
             const body = typeof event.body === "string" ? JSON.parse(event.body) : event.body || event;
@@ -99,7 +115,6 @@ exports.handler = async (event) => {
             const nombre = empleado.Item.nombre?.S;
             const fecha_registro = empleado.Item.fecha_registro?.S || "";
 
-            // Guardar en historial de retirados
             await dynamo.send(new PutItemCommand({
                 TableName: "biosecurity-retirados",
                 Item: {
@@ -110,7 +125,6 @@ exports.handler = async (event) => {
                 }
             }));
 
-            // Eliminar de Rekognition
             const faceId = empleado.Item.face_id?.S;
             if (faceId) {
                 await rekognition.send(new DeleteFacesCommand({
@@ -119,11 +133,12 @@ exports.handler = async (event) => {
                 }));
             }
 
-            // Eliminar de DynamoDB
             await dynamo.send(new DeleteItemCommand({
                 TableName: "biosecurity-empleados",
                 Key: { identificacion: { S: identificacion } }
             }));
+
+            log("INFO", "Empleado eliminado", { identificacion, nombre });
 
             return {
                 statusCode: 200, headers: CORS,
@@ -131,12 +146,12 @@ exports.handler = async (event) => {
             };
 
         } catch (error) {
-            console.log(error);
+            log("ERROR", "Error al eliminar empleado", { error: error.message });
+            Sentry.captureException(error);
             return { statusCode: 500, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: "Error al eliminar", error: error.message }) };
         }
     }
 
-    // ── POST ──
     try {
         const body = typeof event.body === "string" ? JSON.parse(event.body) : event.body || event;
         const { identificacion, nombre, foto } = body;
@@ -145,7 +160,6 @@ exports.handler = async (event) => {
             return { statusCode: 400, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: "Faltan campos: identificacion, nombre o foto" }) };
         }
 
-        // Verificar si la cédula ya existe
         const existente = await dynamo.send(new GetItemCommand({
             TableName: "biosecurity-empleados",
             Key: { identificacion: { S: identificacion } }
@@ -160,7 +174,6 @@ exports.handler = async (event) => {
 
         const buffer = Buffer.from(foto.replace(/^data:image\/\w+;base64,/, ""), "base64");
 
-        // Verificar si el ROSTRO ya existe en la colección (evita duplicados biométricos)
         try {
             const busqueda = await rekognition.send(new SearchFacesByImageCommand({
                 CollectionId: "coleccion2anlusoft",
@@ -173,28 +186,50 @@ exports.handler = async (event) => {
                 const idExistente = busqueda.FaceMatches[0].Face.ExternalImageId;
                 const similitud = busqueda.FaceMatches[0].Similarity.toFixed(1);
 
-                // Buscar nombre del empleado existente
                 let nombreExistente = idExistente;
+                let estaRetirado = false;
                 try {
-                    const empExistente = await dynamo.send(new GetItemCommand({
+                    const empActivo = await dynamo.send(new GetItemCommand({
                         TableName: "biosecurity-empleados",
                         Key: { identificacion: { S: idExistente } }
                     }));
-                    nombreExistente = empExistente.Item?.nombre?.S || idExistente;
+                    if (empActivo.Item) {
+                        nombreExistente = empActivo.Item.nombre?.S || idExistente;
+                    } else {
+                        const empRetirado = await dynamo.send(new GetItemCommand({
+                            TableName: "biosecurity-retirados",
+                            Key: { identificacion: { S: idExistente } }
+                        }));
+                        if (empRetirado.Item) {
+                            nombreExistente = empRetirado.Item.nombre?.S || idExistente;
+                            estaRetirado = true;
+                        }
+                    }
                 } catch(e) {}
 
-                return {
-                    statusCode: 400, headers: CORS,
-                    body: JSON.stringify({
-                        codigo: 1,
-                        descripcion: `Este rostro ya está registrado como "${nombreExistente}" (CC: ${idExistente}) con ${similitud}% de similitud. No se puede registrar el mismo rostro con datos diferentes.`
-                    })
-                };
+                if (estaRetirado) {
+                    const faceIdHuerfano = busqueda.FaceMatches[0].Face.FaceId;
+                    try {
+                        await rekognition.send(new DeleteFacesCommand({
+                            CollectionId: "coleccion2anlusoft",
+                            FaceIds: [faceIdHuerfano]
+                        }));
+                    } catch(e) {
+                        log("WARN", "Error eliminando face huerfano", { error: e.message });
+                    }
+                } else {
+                    return {
+                        statusCode: 400, headers: CORS,
+                        body: JSON.stringify({
+                            codigo: 1,
+                            descripcion: `Este rostro ya está registrado como "${nombreExistente}" (CC: ${idExistente}) con ${similitud}% de similitud.`
+                        })
+                    };
+                }
             }
         } catch(e) {
-            // Si no encuentra rostros la búsqueda lanza error — continuar
             if (!e.message?.includes("no faces")) {
-                console.log("Búsqueda de rostro:", e.message);
+                log("WARN", "Busqueda de rostro fallo", { error: e.message });
             }
         }
 
@@ -219,13 +254,16 @@ exports.handler = async (event) => {
             }
         }));
 
+        log("INFO", "Empleado registrado", { identificacion, nombre, duration_ms: Date.now() - startTime });
+
         return {
             statusCode: 200, headers: CORS,
             body: JSON.stringify({ codigo: 0, descripcion: "Empleado registrado exitosamente", nombre, identificacion })
         };
 
     } catch (error) {
-        console.log(error);
+        log("ERROR", "Error en registro", { error: error.message });
+        Sentry.captureException(error);
         return { statusCode: 500, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: "Error en registro", error: error.message }) };
     }
-};
+});

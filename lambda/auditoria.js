@@ -1,3 +1,7 @@
+// Initialize Sentry FIRST
+require("./instrument.js");
+const Sentry = require("@sentry/aws-serverless");
+
 const { DynamoDBClient, ScanCommand, GetItemCommand } = require("@aws-sdk/client-dynamodb");
 
 const dynamo = new DynamoDBClient({ region: "us-east-1" });
@@ -8,13 +12,25 @@ const CORS = {
     "Access-Control-Allow-Methods": "GET,OPTIONS"
 };
 
-exports.handler = async (event) => {
+function log(level, message, data = {}) {
+    console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level,
+        module: process.env.MODULE_NAME || "auditoria",
+        message,
+        ...data
+    }));
+}
+
+exports.handler = Sentry.wrapHandler(async (event) => {
+    const startTime = Date.now();
+    log("INFO", "Lambda invoked", { method: event.httpMethod });
+
     if (event.httpMethod === "OPTIONS") {
         return { statusCode: 200, headers: CORS, body: "" };
     }
 
     try {
-        // Scan completo con paginación
         let items = [];
         let lastKey = undefined;
         do {
@@ -25,7 +41,6 @@ exports.handler = async (event) => {
             lastKey = response.LastEvaluatedKey;
         } while (lastKey);
 
-        // Agrupar por identificacion y fecha
         const registros = {};
         for (const item of items) {
             const id        = item.identificacion?.S || "DESCONOCIDO";
@@ -64,7 +79,6 @@ exports.handler = async (event) => {
 
         const listaRegistros = Object.values(registros);
 
-        // Buscar nombres faltantes en empleados
         for (const reg of listaRegistros) {
             if (!reg.nombre || reg.nombre === reg.identificacion) {
                 try {
@@ -77,17 +91,20 @@ exports.handler = async (event) => {
             }
         }
 
-        // Ordenar por fecha descendente
         listaRegistros.sort((a, b) => {
             const fa = a.hora_entrada || a.fecha;
             const fb = b.hora_entrada || b.fecha;
             return fb.localeCompare(fa);
         });
 
+        log("INFO", "Auditoria completada", {
+            total_registros: listaRegistros.length,
+            duration_ms: Date.now() - startTime
+        });
+
         const format = event.queryStringParameters?.format;
 
         if (format === "json") {
-            // En pantalla mostrar los 50 más recientes
             return {
                 statusCode: 200,
                 headers: { ...CORS, "Content-Type": "application/json" },
@@ -95,7 +112,6 @@ exports.handler = async (event) => {
             };
         }
 
-        // CSV completo sin límite
         const headers = ["Identificacion", "Nombre", "Fecha", "Hora Entrada", "Hora Salida"];
         const rows = listaRegistros.map(r => [
             r.identificacion,
@@ -117,7 +133,8 @@ exports.handler = async (event) => {
         };
 
     } catch (error) {
-        console.log(error);
+        log("ERROR", "Error en auditoria", { error: error.message });
+        Sentry.captureException(error);
         return { statusCode: 500, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: "Error en auditoría", error: error.message }) };
     }
-};
+});
