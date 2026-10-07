@@ -1,13 +1,11 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { API_AUDITORIA, API_RESET, API_KEY_AUD, API_LIVENESS_INIT, API_LIVENESS_VALIDAR } from '../config'
+import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
+import LivenessScan from '../components/LivenessScan'
 
 export default function Auditoria() {
-  const videoRef = useRef(null)
-  const canvasRef = useRef(null)
-
   const [logueado, setLogueado] = useState(false)
   const [usuarioActual, setUsuarioActual] = useState('')
   const [loginUser, setLoginUser] = useState('')
@@ -20,16 +18,13 @@ export default function Auditoria() {
   const [fechaDesde, setFechaDesde] = useState(() => new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0])
   const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0])
 
-  // Estados para validación con liveness
-  const [mostrarValidacionLiveness, setMostrarValidacionLiveness] = useState(false)
-  const [validacionId, setValidacionId] = useState('')
-  const [livenessSessionId, setLivenessSessionId] = useState('')
-  const [livenessStep, setLivenessStep] = useState('inicio') // inicio -> captura -> validacion
-  const [livenessError, setLivenessError] = useState('')
-  const [livenessOk, setLivenessOk] = useState('')
-  const [livenessLoading, setLivenessLoading] = useState(false)
-  const [livenessValidResult, setLivenessValidResult] = useState(null)
-  const [fotoCapturada, setFotoCapturada] = useState(null)
+  // Validación de acceso por escaneo de persona viva.
+  // No se pide la cédula: el rostro identifica a la persona contra la
+  // colección de Rekognition, y el backend decide con la imagen que AWS
+  // extrae del video verificado.
+  const [escaneando, setEscaneando] = useState(false)
+  const [resultadoAcceso, setResultadoAcceso] = useState(null)
+  const [errorAcceso, setErrorAcceso] = useState('')
 
   const [resetModal, setResetModal] = useState(false)
   const [resetPaso, setResetPaso] = useState(1)
@@ -171,112 +166,34 @@ export default function Auditoria() {
     setResetLoading(false)
   }
 
-  // Funciones para validación de acceso con liveness
-  async function iniciarCamara() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false })
-      if (videoRef.current) videoRef.current.srcObject = stream
-    } catch (err) {
-      setLivenessError('No se pudo acceder a la cámara: ' + err.message)
-    }
+  // ── Validación de acceso por escaneo de persona viva ──────────
+  // El componente de Amplify corre el escaneo contra Rekognition; el
+  // backend resuelve quién es y registra la entrada o la salida.
+
+  function abrirEscaneo() {
+    setResultadoAcceso(null)
+    setErrorAcceso('')
+    setEscaneando(true)
   }
 
-  async function crearSesionLiveness() {
-    if (!validacionId.trim()) {
-      setLivenessError('Ingresa tu número de identificación')
-      return
-    }
-    setLivenessLoading(true)
-    setLivenessError('')
-    try {
-      const r = await fetch(API_LIVENESS_INIT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      })
-      const data = await r.json()
-      if (data.session_id) {
-        setLivenessSessionId(data.session_id)
-        setLivenessStep('captura')
-        setLivenessOk('Sesión de liveness creada. ¡Captura tu foto!')
-        setTimeout(() => iniciarCamara(), 500)
-      } else {
-        setLivenessError('Error creando sesión de liveness')
-      }
-    } catch (err) {
-      setLivenessError('Error: ' + err.message)
-    }
-    setLivenessLoading(false)
+  function accesoValidado(datos) {
+    setResultadoAcceso(datos)
+    setEscaneando(false)
+    cargarAuditoria()
   }
 
-  function capturarFotoLiveness() {
-    if (!videoRef.current || !canvasRef.current) return
-    const context = canvasRef.current.getContext('2d')
-    const video = videoRef.current
-    canvasRef.current.width = video.videoWidth
-    canvasRef.current.height = video.videoHeight
-    context.drawImage(video, 0, 0)
-    const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.95)
-    setFotoCapturada(dataUrl)
-    if (video.srcObject) {
-      video.srcObject.getTracks().forEach(track => track.stop())
-    }
-    setLivenessOk('Foto capturada. Validando...')
-    setLivenessStep('validacion')
+  function accesoRechazado(mensaje) {
+    setErrorAcceso(mensaje)
+    setEscaneando(false)
   }
 
-  async function validarAccesoLiveness() {
-    if (!fotoCapturada || !livenessSessionId) {
-      setLivenessError('Falta información para validar')
-      return
-    }
-    setLivenessLoading(true)
-    setLivenessError('')
-    try {
-      const r = await fetch(API_LIVENESS_VALIDAR, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          liveness_session_id: livenessSessionId,
-          imgvalidacion: fotoCapturada,
-          identificacion: validacionId
-        })
-      })
-      const data = await r.json()
-      if (r.ok && data.success) {
-        setLivenessValidResult({
-          exito: true,
-          mensaje: '✅ Acceso autorizado',
-          identificacion: data.identificacion,
-          similitud: (data.similarity * 100).toFixed(2) + '%'
-        })
-        setLivenessOk('¡Identidad validada exitosamente!')
-      } else {
-        setLivenessValidResult({
-          exito: false,
-          mensaje: '❌ Validación fallida',
-          razon: data.error || 'No se pudo validar la identidad'
-        })
-        setLivenessError(data.error || 'Error en validación')
-      }
-    } catch (err) {
-      setLivenessError('Error en validación: ' + err.message)
-    }
-    setLivenessLoading(false)
+  function cerrarEscaneo() {
+    setEscaneando(false)
   }
 
-  function cerrarValidacionLiveness() {
-    setMostrarValidacionLiveness(false)
-    setValidacionId('')
-    setLivenessSessionId('')
-    setLivenessStep('inicio')
-    setLivenessValidResult(null)
-    setFotoCapturada(null)
-    setLivenessError('')
-    setLivenessOk('')
-    if (videoRef.current?.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop())
-    }
+  function limpiarResultado() {
+    setResultadoAcceso(null)
+    setErrorAcceso('')
   }
 
   const cardStyle = { background: 'rgba(255,255,255,0.75)', borderRadius: 20, padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.4)' }
@@ -469,87 +386,65 @@ export default function Auditoria() {
 
           {/* VALIDACIÓN BIOMÉTRICA CON LIVENESS */}
           <div style={cardStyle}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)', marginBottom: 6 }}>🔐 Validación Biométrica de Acceso</div>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>Verifica la identidad de empleados con detección de liveness</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)', marginBottom: 6 }}>Validación de acceso</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>
+              Escaneo facial en vivo. El rostro identifica a la persona y queda el registro de entrada o salida.
+            </div>
 
-            {!mostrarValidacionLiveness ? (
-              <button onClick={() => setMostrarValidacionLiveness(true)} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 12, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-                ▶️ Iniciar Validación
-              </button>
-            ) : (
+            {!escaneando && !resultadoAcceso && !errorAcceso && (
               <>
-                {livenessStep === 'inicio' && (
-                  <>
-                    <div style={{ marginBottom: 14 }}>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación del empleado</label>
-                      <input style={{ ...inputStyle, padding: '13px 16px' }} type="text" placeholder="Ej: 1234567890" value={validacionId} onChange={e => setValidacionId(e.target.value)} disabled={livenessLoading} />
-                    </div>
-                    <button onClick={crearSesionLiveness} disabled={livenessLoading || !validacionId} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 12, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}>
-                      {livenessLoading ? '⏳ Iniciando...' : '🔐 Iniciar Captura'}
-                    </button>
-                    <button onClick={cerrarValidacionLiveness} style={{ width: '100%', padding: 12, border: '2px solid #ddd', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                      Cancelar
-                    </button>
-                  </>
-                )}
-
-                {livenessStep === 'captura' && (
-                  <>
-                    <div style={{ marginBottom: 12, padding: 10, background: '#fff3e0', borderRadius: 10, border: '1px solid #FF9800', fontSize: 12, color: '#e65100' }}>
-                      ℹ️ Sesión: <strong>{livenessSessionId?.substring(0, 12)}...</strong>
-                    </div>
-                    <div style={{ marginBottom: 14 }}>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Video en vivo</label>
-                      <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '4/3', marginBottom: 8 }}>
-                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      </div>
-                      <canvas ref={canvasRef} style={{ display: 'none' }} />
-                    </div>
-                    <button onClick={capturarFotoLiveness} disabled={livenessLoading} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 12, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}>
-                      📸 Capturar Foto
-                    </button>
-                    <button onClick={cerrarValidacionLiveness} disabled={livenessLoading} style={{ width: '100%', padding: 12, border: '2px solid #ddd', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                      Cancelar
-                    </button>
-                  </>
-                )}
-
-                {livenessStep === 'validacion' && (
-                  <>
-                    <div style={{ marginBottom: 14 }}>
-                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Foto capturada</label>
-                      {fotoCapturada && <img src={fotoCapturada} alt="preview" style={{ maxWidth: '100%', borderRadius: 12, marginTop: 8 }} />}
-                    </div>
-                    <button onClick={validarAccesoLiveness} disabled={livenessLoading} style={{ width: '100%', padding: 14, border: 'none', borderRadius: 12, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}>
-                      {livenessLoading ? '⏳ Validando...' : '✅ Validar Acceso'}
-                    </button>
-                    <button onClick={() => { setLivenessStep('captura'); setFotoCapturada(null); setTimeout(() => iniciarCamara(), 300) }} disabled={livenessLoading} style={{ width: '100%', padding: 12, border: '2px solid #888', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                      🔄 Reintentar
-                    </button>
-                  </>
-                )}
-
-                {livenessValidResult && (
-                  <div style={{ marginTop: 14, padding: 14, borderRadius: 12, background: livenessValidResult.exito ? '#e8f5e9' : '#fdecea', border: '2px solid ' + (livenessValidResult.exito ? '#2e7d32' : '#c62828') }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: livenessValidResult.exito ? '#2e7d32' : '#c62828', marginBottom: 8 }}>{livenessValidResult.mensaje}</div>
-                    {livenessValidResult.exito && (
-                      <>
-                        <div style={{ fontSize: 12, color: '#1b5e20', marginBottom: 4 }}>CC: <strong>{livenessValidResult.identificacion}</strong></div>
-                        <div style={{ fontSize: 12, color: '#1b5e20' }}>Similitud: <strong>{livenessValidResult.similitud}</strong></div>
-                      </>
-                    )}
-                    {!livenessValidResult.exito && (
-                      <div style={{ fontSize: 12, color: '#b71c1c' }}>{livenessValidResult.razon}</div>
-                    )}
-                    <button onClick={cerrarValidacionLiveness} style={{ width: '100%', marginTop: 10, padding: 10, border: 'none', borderRadius: 10, background: livenessValidResult.exito ? '#2e7d32' : '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                      Cerrar
-                    </button>
-                  </div>
-                )}
-
-                {livenessError && <div style={{ ...alertErr, marginTop: 10 }}>{livenessError}</div>}
-                {livenessOk && <div style={{ ...alertOk, marginTop: 10 }}>{livenessOk}</div>}
+                <div style={{ marginBottom: 14, padding: 12, background: '#f0f4ff', borderRadius: 12, borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.5 }}>
+                  Centre el rostro en el óvalo mientras la pantalla emite destellos de color.
+                  Una fotografía impresa o mostrada en otra pantalla no supera la prueba.
+                </div>
+                <button onClick={abrirEscaneo} style={btnPrimary}>
+                  Escanear rostro
+                </button>
               </>
+            )}
+
+            {escaneando && (
+              <>
+                <LivenessScan
+                  proposito="validacion"
+                  onExito={accesoValidado}
+                  onFallo={accesoRechazado}
+                  onCancelar={cerrarEscaneo}
+                />
+                <button onClick={cerrarEscaneo} style={{ width: '100%', marginTop: 12, padding: 12, border: '2px solid #ddd', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  Cancelar
+                </button>
+              </>
+            )}
+
+            {resultadoAcceso && (
+              <div style={{ padding: 16, borderRadius: 12, background: '#e8f5e9', border: '2px solid #2e7d32' }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#2e7d32', marginBottom: 8 }}>
+                  {resultadoAcceso.mensaje}, {resultadoAcceso.nombre}
+                </div>
+                <div style={{ fontSize: 13, color: '#1b5e20', marginBottom: 3 }}>
+                  {resultadoAcceso.tipo_acceso} · CC {resultadoAcceso.identificacion}
+                </div>
+                <div style={{ fontSize: 12, color: '#1b5e20', marginBottom: 3 }}>
+                  Coincidencia del rostro: <strong>{resultadoAcceso.similitud}%</strong>
+                </div>
+                <div style={{ fontSize: 12, color: '#1b5e20' }}>
+                  Confianza del escaneo: <strong>{resultadoAcceso.confianza_liveness}%</strong>
+                </div>
+                <button onClick={limpiarResultado} style={{ width: '100%', marginTop: 12, padding: 10, border: 'none', borderRadius: 10, background: '#2e7d32', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  Nuevo escaneo
+                </button>
+              </div>
+            )}
+
+            {errorAcceso && (
+              <div style={{ padding: 16, borderRadius: 12, background: '#fdecea', border: '2px solid #c62828' }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#c62828', marginBottom: 6 }}>Acceso no autorizado</div>
+                <div style={{ fontSize: 12, color: '#b71c1c', lineHeight: 1.5 }}>{errorAcceso}</div>
+                <button onClick={limpiarResultado} style={{ width: '100%', marginTop: 12, padding: 10, border: 'none', borderRadius: 10, background: '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  Intentar de nuevo
+                </button>
+              </div>
             )}
           </div>
         </div>

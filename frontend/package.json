@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-amplify/ui-react-liveness": "^3.7.0",
+    "aws-amplify": "^6.22.1",
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4"
@@ -16,5 +18,11 @@
   "devDependencies": {
     "eslint": "^9",
     "eslint-config-next": "16.2.4"
+  },
+  "overrides": {
+    "@xstate/react": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
   }
 }
