@@ -1,3 +1,8 @@
+// Liveness Detection & Validation (Rekognition)
+export const API_LIVENESS_INIT = "https://4lq3kxldzc.execute-api.us-east-1.amazonaws.com/prod/liveness-init";
+export const API_LIVENESS_VALIDAR = "https://4lq3kxldzc.execute-api.us-east-1.amazonaws.com/prod/validar";
+
+// Legacy APIs
 export const API_VALIDAR   = "https://9bm7r0q9wi.execute-api.us-east-1.amazonaws.com/best/validar";
 export const API_RRHH_URL  = "https://uadjcukyx1.execute-api.us-east-1.amazonaws.com/prod/registrar";
 export const API_AUDITORIA = "https://3tqg18yo1l.execute-api.us-east-1.amazonaws.com/prod/reporte";

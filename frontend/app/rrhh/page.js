@@ -1,9 +1,8 @@
 'use client'
 import { useRef, useEffect, useState } from 'react'
-import LivenessRegister from './components/LivenessRegister'
 import Image from 'next/image'
 import Link from 'next/link'
-import { API_RRHH_URL, API_RESET, API_KEY_RRHH } from '../config'
+import { API_RRHH_URL, API_RESET, API_KEY_RRHH, API_LIVENESS_INIT, API_LIVENESS_VALIDAR } from '../config'
 
 export default function RRHH() {
   const videoRef = useRef(null)
@@ -24,6 +23,13 @@ export default function RRHH() {
   const [regOk, setRegOk] = useState('')
   const [regErr, setRegErr] = useState('')
   const [regLoading, setRegLoading] = useState(false)
+
+  // Estados para flujo de liveness
+  const [livenessSessionId, setLivenessSessionId] = useState('')
+  const [livenessStep, setLivenessStep] = useState('inicio') // inicio -> captura -> validacion -> registro
+  const [livenessValidResult, setLivenessValidResult] = useState(null)
+  const [livenessLoading, setLivenessLoading] = useState(false)
+  const [livenessError, setLivenessError] = useState('')
 
   const [eliminarId, setEliminarId] = useState('')
   const [empleadoEncontrado, setEmpleadoEncontrado] = useState(null)
@@ -154,6 +160,140 @@ export default function RRHH() {
       alerta(setRegErr, '⚠️ Sin conexión')
     }
     setRegLoading(false)
+  }
+
+  // Funciones para flujo de liveness detection
+  async function crearSesionLiveness() {
+    if (!identificacion) { alerta(setLivenessError, 'Ingrese el número de identificación'); return }
+    setLivenessLoading(true)
+    setLivenessError('')
+    try {
+      const r = await fetch(API_LIVENESS_INIT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      const data = await r.json()
+      if (data.session_id) {
+        setLivenessSessionId(data.session_id)
+        setLivenessStep('captura')
+        alerta(setRegOk, 'Sesión de liveness creada. ¡Captura tu foto!')
+        setTimeout(() => iniciarCamara(), 500)
+      } else {
+        alerta(setLivenessError, 'Error creando sesión de liveness')
+      }
+    } catch (err) {
+      alerta(setLivenessError, '⚠️ Error: ' + err.message)
+    }
+    setLivenessLoading(false)
+  }
+
+  function capturarFotoLiveness() {
+    if (!videoRef.current || !canvasRef.current) return
+    const context = canvasRef.current.getContext('2d')
+    const video = videoRef.current
+    canvasRef.current.width = video.videoWidth
+    canvasRef.current.height = video.videoHeight
+    context.drawImage(video, 0, 0)
+    const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.95)
+    setFoto(dataUrl)
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop())
+    }
+    alerta(setRegOk, 'Foto capturada. Validando...')
+    setLivenessStep('validacion')
+  }
+
+  async function validarLiveness() {
+    if (!foto || !livenessSessionId) {
+      alerta(setLivenessError, 'Falta información para validar')
+      return
+    }
+    setLivenessLoading(true)
+    setLivenessError('')
+    try {
+      const r = await fetch(API_LIVENESS_VALIDAR, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          liveness_session_id: livenessSessionId,
+          imgvalidacion: foto,
+          identificacion: identificacion
+        })
+      })
+      const data = await r.json()
+      if (r.ok && data.success) {
+        setLivenessValidResult({
+          exito: true,
+          identificacion: data.identificacion,
+          similitud: (data.similarity * 100).toFixed(2) + '%'
+        })
+        alerta(setRegOk, '✅ Identidad validada exitosamente')
+        setLivenessStep('registro')
+      } else {
+        alerta(setLivenessError, data.error || 'Validación fallida')
+        setLivenessValidResult({ exito: false })
+      }
+    } catch (err) {
+      alerta(setLivenessError, '⚠️ Error en validación: ' + err.message)
+    }
+    setLivenessLoading(false)
+  }
+
+  async function registrarConLiveness() {
+    if (!nombre || !livenessValidResult?.exito) {
+      alerta(setLivenessError, 'Falta información para registrar')
+      return
+    }
+    setLivenessLoading(true)
+    try {
+      const r = await fetch(API_RRHH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY_RRHH },
+        body: JSON.stringify({
+          identificacion: livenessValidResult.identificacion,
+          nombre: nombre,
+          foto: foto,
+          liveness_session_id: livenessSessionId,
+          metodo_validacion: 'liveness'
+        })
+      })
+      const data = await r.json()
+      const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
+      if (body.codigo === 0) {
+        playSound('success')
+        alerta(setRegOk, `✅ ${body.nombre} registrado con liveness exitosamente`)
+        // Reset para nuevo registro
+        setIdentificacion('')
+        setNombre('')
+        setFoto(null)
+        setLivenessSessionId('')
+        setLivenessStep('inicio')
+        setLivenessValidResult(null)
+        setUseLiveness(false)
+      } else {
+        playSound('error')
+        alerta(setLivenessError, body.descripcion || 'Error al registrar')
+      }
+    } catch (err) {
+      playSound('error')
+      alerta(setLivenessError, '⚠️ Error: ' + err.message)
+    }
+    setLivenessLoading(false)
+  }
+
+  function cancelarLiveness() {
+    setIdentificacion('')
+    setNombre('')
+    setFoto(null)
+    setLivenessSessionId('')
+    setLivenessStep('inicio')
+    setLivenessValidResult(null)
+    setUseLiveness(false)
+    setLivenessError('')
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject.getTracks().forEach(track => track.stop())
+    }
   }
 
   async function buscarEmpleado() {
@@ -463,35 +603,120 @@ export default function RRHH() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)' }}>Registrar Empleado</div>
-                <div style={{ fontSize: 13, color: '#666' }}>Complete los datos y tome la foto</div>
+                <div style={{ fontSize: 13, color: '#666' }}>{useLiveness ? 'Con detección de liveness' : 'Complete los datos y tome la foto'}</div>
               </div>
               <button onClick={logout} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer' }}>Cerrar sesión</button>
             </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación</label>
-              <input style={inputStyle} type="text" placeholder="Ej: 1234567890" value={identificacion} onChange={e => setIdentificacion(e.target.value)} />
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nombre completo</label>
-              <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} />
-            </div>
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Foto del empleado</label>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {!fotoTomada && <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', width: '100%', maxWidth: 280, aspectRatio: '3/4', maxHeight: 220 }}>
-                  <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>}
-                {fotoTomada && foto && <img src={foto} alt="preview" style={{ maxWidth: 280, borderRadius: 12, marginTop: 10 }} />}
-                <canvas ref={canvasRef} style={{ display: 'none' }} />
-              </div>
-            </div>
-            {!fotoTomada && <button style={btnPrimary} onClick={tomarFoto}>📷 Tomar Foto</button>}
-            {fotoTomada && <>
-              <button style={{ ...btnSecondary, marginBottom: 8 }} onClick={repetirFoto}>🔄 Repetir Foto</button>
-              <button style={{ ...btnPrimary, background: 'var(--blue)' }} onClick={registrar} disabled={regLoading}>{regLoading ? '⏳ Registrando...' : '✅ Registrar Empleado'}</button>
-            </>}
+
+            {/* SELECCIÓN DE MÉTODO */}
+            {!useLiveness && livenessStep === 'inicio' && (
+              <>
+                <div style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 12, borderLeft: '4px solid var(--blue)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue)', marginBottom: 8 }}>Elige el método de registro:</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setUseLiveness(false)} style={{ flex: 1, padding: '10px 12px', background: 'white', border: '2px solid #ccc', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#666', cursor: 'pointer' }}>📷 Foto Simple</button>
+                    <button onClick={() => setUseLiveness(true)} style={{ flex: 1, padding: '10px 12px', background: 'var(--blue)', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, color: 'white', cursor: 'pointer' }}>🔐 Liveness Detection</button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* FLUJO FOTO SIMPLE */}
+            {!useLiveness && (
+              <>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación</label>
+                  <input style={inputStyle} type="text" placeholder="Ej: 1234567890" value={identificacion} onChange={e => setIdentificacion(e.target.value)} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nombre completo</label>
+                  <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Foto del empleado</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    {!fotoTomada && <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', width: '100%', maxWidth: 280, aspectRatio: '3/4', maxHeight: 220 }}>
+                      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>}
+                    {fotoTomada && foto && <img src={foto} alt="preview" style={{ maxWidth: 280, borderRadius: 12, marginTop: 10 }} />}
+                    <canvas ref={canvasRef} style={{ display: 'none' }} />
+                  </div>
+                </div>
+                {!fotoTomada && <button style={btnPrimary} onClick={tomarFoto}>📷 Tomar Foto</button>}
+                {fotoTomada && <>
+                  <button style={{ ...btnSecondary, marginBottom: 8 }} onClick={repetirFoto}>🔄 Repetir Foto</button>
+                  <button style={{ ...btnPrimary, background: 'var(--blue)' }} onClick={registrar} disabled={regLoading}>{regLoading ? '⏳ Registrando...' : '✅ Registrar Empleado'}</button>
+                </>}
+              </>
+            )}
+
+            {/* FLUJO LIVENESS */}
+            {useLiveness && (
+              <>
+                {livenessStep === 'inicio' && (
+                  <>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación</label>
+                      <input style={inputStyle} type="text" placeholder="Ej: 1234567890" value={identificacion} onChange={e => setIdentificacion(e.target.value)} disabled={livenessLoading} />
+                    </div>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nombre completo</label>
+                      <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} disabled={livenessLoading} />
+                    </div>
+                    <button style={btnPrimary} onClick={crearSesionLiveness} disabled={livenessLoading || !identificacion}>{livenessLoading ? '⏳ Iniciando...' : '🔐 Iniciar Liveness'}</button>
+                    <button style={{ ...btnSecondary, marginTop: 8 }} onClick={() => setUseLiveness(false)}>← Volver a Foto Simple</button>
+                  </>
+                )}
+
+                {livenessStep === 'captura' && (
+                  <>
+                    <div style={{ marginBottom: 12, padding: 12, background: '#fff3e0', borderRadius: 12, border: '1px solid #FF9800', fontSize: 12, color: '#e65100' }}>
+                      ℹ️ Sesión ID: <strong>{livenessSessionId?.substring(0, 12)}...</strong>
+                    </div>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Video en vivo - Mira a la cámara</label>
+                      <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', background: '#000', width: '100%', aspectRatio: '4/3', marginBottom: 8 }}>
+                        <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                      <canvas ref={canvasRef} style={{ display: 'none' }} />
+                    </div>
+                    <button style={btnPrimary} onClick={capturarFotoLiveness} disabled={livenessLoading}>📸 Capturar Foto</button>
+                    <button style={{ ...btnSecondary, marginTop: 8 }} onClick={cancelarLiveness} disabled={livenessLoading}>❌ Cancelar</button>
+                  </>
+                )}
+
+                {livenessStep === 'validacion' && (
+                  <>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Foto capturada - Validando...</label>
+                      {foto && <img src={foto} alt="preview" style={{ maxWidth: '100%', borderRadius: 12, marginTop: 8 }} />}
+                    </div>
+                    <button style={btnPrimary} onClick={validarLiveness} disabled={livenessLoading}>{livenessLoading ? '⏳ Validando...' : '✅ Validar Acceso'}</button>
+                    <button style={{ ...btnSecondary, marginTop: 8 }} onClick={cancelarLiveness} disabled={livenessLoading}>🔄 Reintentar</button>
+                  </>
+                )}
+
+                {livenessStep === 'registro' && livenessValidResult?.exito && (
+                  <>
+                    <div style={{ marginBottom: 14, padding: 14, background: '#e8f5e9', borderRadius: 12, border: '2px solid #2e7d32' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#2e7d32', marginBottom: 6 }}>✅ Identidad validada exitosamente</div>
+                      <div style={{ fontSize: 12, color: '#1b5e20' }}>Identificación: <strong>{livenessValidResult.identificacion}</strong></div>
+                      <div style={{ fontSize: 12, color: '#1b5e20' }}>Similitud: <strong>{livenessValidResult.similitud}</strong></div>
+                    </div>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nombre completo</label>
+                      <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} disabled={livenessLoading} />
+                    </div>
+                    <button style={{ ...btnPrimary, background: 'var(--blue)' }} onClick={registrarConLiveness} disabled={livenessLoading || !nombre}>{livenessLoading ? '⏳ Registrando...' : '✅ Registrar Empleado'}</button>
+                    <button style={{ ...btnSecondary, marginTop: 8 }} onClick={cancelarLiveness} disabled={livenessLoading}>❌ Cancelar</button>
+                  </>
+                )}
+              </>
+            )}
+
             {regOk && <div style={{ ...alertOk, marginTop: 10 }}>{regOk}</div>}
             {regErr && <div style={{ ...alertErr, marginTop: 10 }}>{regErr}</div>}
+            {livenessError && <div style={{ ...alertErr, marginTop: 10 }}>{livenessError}</div>}
           </div>
 
           {/* ELIMINAR */}
