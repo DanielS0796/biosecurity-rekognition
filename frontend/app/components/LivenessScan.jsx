@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Amplify } from 'aws-amplify'
 import { FaceLivenessDetector } from '@aws-amplify/ui-react-liveness'
 import '@aws-amplify/ui-react/styles.css'
@@ -25,6 +26,14 @@ import {
  * este componente solo le avisa al backend con el session_id; el Lambda
  * consulta el veredicto a Rekognition y actúa con la imagen que AWS
  * extrajo del video, no con una que mande el navegador.
+ *
+ * El escaneo se monta en un portal sobre el body, no donde se invoca. En
+ * móvil el componente de Amplify se pone `position: fixed` a pantalla
+ * completa durante la verificación, y las tarjetas de la app usan
+ * `backdrop-filter`, que convierte a la tarjeta en el marco de referencia de
+ * los elementos fijos. Encerrado ahí, el escaneo intenta ocupar "toda la
+ * pantalla" y termina ocupando el tamaño de la tarjeta, descentrado y con la
+ * proporción deformada. Sobre el body no hay nada que lo contenga.
  *
  * Props:
  *   proposito      "registro" | "validacion"
@@ -134,8 +143,30 @@ export default function LivenessScan({
   const [sessionId, setSessionId] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState('')
+  // El desafío sin destellos habilita elegir entre cámara frontal y trasera,
+  // y en un control de acceso la trasera no tiene sentido. Se preselecciona
+  // la frontal y el selector queda oculto por CSS.
+  const [deviceId, setDeviceId] = useState(null)
+  const [montado, setMontado] = useState(false)
   // Evita que un render extra del componente dispare dos sesiones.
   const iniciado = useRef(false)
+
+  useEffect(() => { setMontado(true) }, [])
+
+  // Pide un stream con la cámara frontal solo para quedarse con su
+  // identificador. De paso dispara el permiso de cámara antes del escaneo.
+  async function buscarCamaraFrontal() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user' },
+      })
+      const id = stream.getVideoTracks()[0]?.getSettings?.().deviceId || null
+      stream.getTracks().forEach(t => t.stop())
+      return id
+    } catch {
+      return null
+    }
+  }
 
   useEffect(() => {
     if (iniciado.current) return
@@ -153,6 +184,8 @@ export default function LivenessScan({
 
     ;(async () => {
       try {
+        setDeviceId(await buscarCamaraFrontal())
+
         const r = await fetch(API_LIVENESS_INIT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -222,21 +255,63 @@ export default function LivenessScan({
     )
   }
 
-  return (
-    <div style={{ maxWidth: 640, margin: '0 auto' }}>
-      <FaceLivenessDetector
-        sessionId={sessionId}
-        region={AWS_REGION}
-        onAnalysisComplete={alCompletar}
-        onError={alFallar}
-        onUserCancel={onCancelar}
-        displayText={TEXTOS}
-      />
+  if (!montado) return null
+
+  const escaneo = (
+    <div style={estilos.overlay}>
+      <div style={estilos.marco}>
+        <FaceLivenessDetector
+          sessionId={sessionId}
+          region={AWS_REGION}
+          onAnalysisComplete={alCompletar}
+          onError={alFallar}
+          onUserCancel={onCancelar}
+          displayText={TEXTOS}
+          config={deviceId ? { deviceId } : undefined}
+        />
+      </div>
+      <button onClick={onCancelar} style={estilos.cancelar}>
+        Cancelar
+      </button>
     </div>
   )
+
+  return createPortal(escaneo, document.body)
 }
 
 const estilos = {
+  // Sin backdrop-filter, transform, filter, perspective ni will-change: todos
+  // crean un containing block y volverían a romper el modo pantalla completa
+  // del escaneo en móvil.
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 9999,
+    background: '#101828',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    padding: 16,
+    overflowY: 'auto',
+  },
+  marco: {
+    width: '100%',
+    maxWidth: 640,
+  },
+  cancelar: {
+    padding: '12px 28px',
+    border: '1.5px solid rgba(255,255,255,0.35)',
+    borderRadius: 10,
+    background: 'transparent',
+    color: '#fff',
+    fontFamily: 'inherit',
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
   caja: {
     padding: '2rem',
     textAlign: 'center',

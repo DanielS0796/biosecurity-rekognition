@@ -494,6 +494,8 @@ export default function RRHH() {
                 <div style={{ marginBottom: 12, padding: 12, background: '#f7f7f7', borderRadius: 12, fontSize: 12, color: '#444' }}>
                   Registrando a <strong>{nombre}</strong> · CC {identificacion}
                 </div>
+                {/* El escaneo se dibuja sobre toda la pantalla desde un
+                    portal, con su propio botón de cancelar. */}
                 <LivenessScan
                   proposito="registro"
                   identificacion={identificacion.trim()}
@@ -503,9 +505,6 @@ export default function RRHH() {
                   onFallo={registroFallido}
                   onCancelar={cancelarEscaneo}
                 />
-                <button style={{ ...btnSecondary, marginTop: 12 }} onClick={cancelarEscaneo}>
-                  Cancelar
-                </button>
               </>
             )}
 

@@ -20,3 +20,16 @@ body {
   overflow-x: hidden;
   background: var(--purple-dark);
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Escaneo de persona viva (AWS Face Liveness)
+   ───────────────────────────────────────────────────────────── */
+
+/* El desafío sin destellos que usa el control de acceso permite elegir entre
+   cámara frontal y trasera, y el componente muestra un selector cuando el
+   dispositivo tiene varias. En un control de acceso la trasera no sirve: la
+   frontal se preselecciona por deviceId y el selector se oculta, porque el
+   componente no expone una opción para desactivarlo. */
+.amplify-liveness-start-screen-camera-select__container {
+  display: none !important;
+}

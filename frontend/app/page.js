@@ -103,18 +103,15 @@ export default function Home() {
               </>
             )}
 
+            {/* El escaneo se dibuja sobre toda la pantalla desde un portal,
+                con su propio botón de cancelar. */}
             {escaneando && (
-              <div style={{ width: '100%' }}>
-                <LivenessScan
-                  proposito="validacion"
-                  onExito={accesoConcedido}
-                  onFallo={accesoDenegado}
-                  onCancelar={cancelarEscaneo}
-                />
-                <button onClick={cancelarEscaneo} style={{ width: '100%', marginTop: 12, padding: 12, border: '2px solid #ddd', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  Cancelar
-                </button>
-              </div>
+              <LivenessScan
+                proposito="validacion"
+                onExito={accesoConcedido}
+                onFallo={accesoDenegado}
+                onCancelar={cancelarEscaneo}
+              />
             )}
 
             {resultado && (

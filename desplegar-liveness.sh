@@ -62,6 +62,10 @@ adoptar aws_dynamodb_table.retirados          "biosecurity-retirados"
 adoptar aws_dynamodb_table.accesos            "biosecurity-accesos"
 adoptar aws_dynamodb_table.liveness_sessions  "biosecurity-liveness-sessions"
 adoptar aws_s3_bucket.liveness_videos         "biosecurity-liveness-videos-${CUENTA}"
+adoptar aws_lambda_function.auditoria         "biosecurity-auditoria"
+adoptar aws_lambda_function.registrar_empleado "biosecurity-registrar-empleado"
+adoptar aws_lambda_function.validacion_biometrica "validacionderostros"
+adoptar aws_lambda_function.reset             "biosecurity-reset"
 
 echo
 echo "──────────────────────────────────────────────────"
