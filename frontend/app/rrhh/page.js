@@ -1,5 +1,6 @@
 'use client'
 import { useRef, useEffect, useState } from 'react'
+import LivenessRegister from './components/LivenessRegister'
 import Image from 'next/image'
 import Link from 'next/link'
 import { API_RRHH_URL, API_RESET, API_KEY_RRHH } from '../config'
@@ -18,6 +19,7 @@ export default function RRHH() {
   const [identificacion, setIdentificacion] = useState('')
   const [nombre, setNombre] = useState('')
   const [foto, setFoto] = useState(null)
+  const [useLiveness, setUseLiveness] = useState(false)
   const [fotoTomada, setFotoTomada] = useState(false)
   const [regOk, setRegOk] = useState('')
   const [regErr, setRegErr] = useState('')
