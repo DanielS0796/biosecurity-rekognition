@@ -16,6 +16,8 @@ export default function Auditoria() {
   const [loading, setLoading] = useState(false)
   const [fechaDesde, setFechaDesde] = useState(() => new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0])
   const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0])
+  const [errorCarga, setErrorCarga] = useState('')
+  const [exportando, setExportando] = useState(false)
 
   const [resetModal, setResetModal] = useState(false)
   const [resetPaso, setResetPaso] = useState(1)
@@ -55,50 +57,95 @@ export default function Auditoria() {
     setDatos([])
   }
 
+  // El filtro de fechas lo resuelve el servidor. Antes el Lambda devolvía
+  // solo los 50 registros más recientes y el recorte por fecha se hacía acá,
+  // sobre ese puñado: buscar algo de meses atrás no devolvía nada porque esos
+  // registros nunca llegaban al navegador.
   async function cargarAuditoria() {
     setLoading(true)
+    setErrorCarga('')
     try {
-      const r = await fetch(API_AUDITORIA + '?format=json', { headers: { 'x-api-key': API_KEY_AUD } })
+      const params = new URLSearchParams({ format: 'json' })
+      if (fechaDesde) params.set('desde', fechaDesde)
+      if (fechaHasta) params.set('hasta', fechaHasta)
+
+      const r = await fetch(`${API_AUDITORIA}?${params}`, { headers: { 'x-api-key': API_KEY_AUD } })
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       setDatos(body.items || [])
-    } catch {}
+    } catch (err) {
+      setDatos([])
+      setErrorCarga('No se pudieron cargar los registros: ' + err.message)
+    }
     setLoading(false)
   }
 
-  function formatHora(iso) {
-    if (!iso) return '-'
-    const d = new Date(iso)
-    return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }) + ' ' +
-      d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-  }
+  // Excel en configuración regional de español trata la coma como separador
+  // decimal, no de columnas, así que un CSV con comas cae entero en la
+  // primera columna. Se genera un .xlsx de verdad, con encabezados y anchos.
+  // La librería se carga en este momento y no al abrir la página, para no
+  // sumarle peso a la carga inicial.
+  async function exportarExcel() {
+    if (!datos.length) { alert('No hay registros para exportar. Presione Buscar primero.'); return }
+    setExportando(true)
+    try {
+      const ExcelJS = (await import('exceljs')).default
+      const libro = new ExcelJS.Workbook()
+      libro.creator = 'Biosecurity UCompensar'
+      libro.created = new Date()
 
-  const filtrados = datos.filter(i => {
-    const f = i.fecha || (i.hora_entrada ? i.hora_entrada.split('T')[0] : '')
-    if (!f) return true
-    return (!fechaDesde || f >= fechaDesde) && (!fechaHasta || f <= fechaHasta)
-  }).sort((a, b) => (b.hora_entrada || '').localeCompare(a.hora_entrada || ''))
+      const hoja = libro.addWorksheet('Accesos', {
+        views: [{ state: 'frozen', ySplit: 1 }],
+      })
 
-  function exportarCSV() {
-    if (!filtrados.length) { alert('No hay datos. Presione Buscar primero.'); return }
-    const headers = ['Identificacion', 'Nombre', 'Fecha Entrada', 'Hora Entrada', 'Fecha Salida', 'Hora Salida']
-    const rows = filtrados.map(i => {
-      const entrada = i.hora_entrada ? new Date(i.hora_entrada) : null
-      const salida = i.hora_salida ? new Date(i.hora_salida) : null
-      return [
-        i.identificacion || '', i.nombre || '',
-        entrada ? entrada.toLocaleDateString('es-CO') : '',
-        entrada ? entrada.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '',
-        salida ? salida.toLocaleDateString('es-CO') : '',
-        salida ? salida.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : 'Sin salida'
+      hoja.columns = [
+        { header: 'Identificación', key: 'identificacion', width: 18 },
+        { header: 'Nombre', key: 'nombre', width: 32 },
+        { header: 'Fecha', key: 'fecha', width: 14 },
+        { header: 'Hora entrada', key: 'entrada', width: 14 },
+        { header: 'Hora salida', key: 'salida', width: 14 },
+        { header: 'Método', key: 'metodo', width: 14 },
       ]
-    })
-    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `accesos_${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
+
+      hoja.getRow(1).eachCell(celda => {
+        celda.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+        celda.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A2D5A' } }
+        celda.alignment = { vertical: 'middle', horizontal: 'left' }
+      })
+      hoja.getRow(1).height = 22
+
+      datos.forEach(i => {
+        const fila = hoja.addRow({
+          identificacion: i.identificacion || '',
+          nombre: i.nombre || '',
+          fecha: i.fecha || '',
+          entrada: i.hora_entrada || '',
+          salida: i.hora_salida || 'Sin salida',
+          metodo: i.metodo === 'liveness' ? 'Persona viva' : (i.metodo || ''),
+        })
+        if (!i.hora_salida) {
+          fila.getCell('salida').font = { color: { argb: 'FF999999' }, italic: true }
+        }
+      })
+
+      // Deja la fila de encabezados como filtro, que es lo que vuelve
+      // utilizable un reporte de varios cientos de filas.
+      hoja.autoFilter = { from: 'A1', to: `F${datos.length + 1}` }
+
+      const buffer = await libro.xlsx.writeBuffer()
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `accesos_${fechaDesde}_a_${fechaHasta}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert('No se pudo generar el archivo: ' + err.message)
+    }
+    setExportando(false)
   }
 
   async function solicitarCodigo() {
@@ -276,9 +323,9 @@ export default function Auditoria() {
           {/* STATS */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
-              { num: filtrados.length, lbl: 'Total', color: 'var(--blue)' },
-              { num: filtrados.filter(i => i.hora_salida).length, lbl: 'Con salida', color: '#2e7d32' },
-              { num: filtrados.filter(i => !i.hora_salida).length, lbl: 'Sin salida', color: '#c62828' }
+              { num: datos.length, lbl: 'Total', color: 'var(--blue)' },
+              { num: datos.filter(i => i.hora_salida).length, lbl: 'Con salida', color: '#2e7d32' },
+              { num: datos.filter(i => !i.hora_salida).length, lbl: 'Sin salida', color: '#c62828' }
             ].map((s, i) => (
               <div key={i} style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 14, padding: '14px 8px', textAlign: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.num}</div>
@@ -307,15 +354,17 @@ export default function Auditoria() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={cargarAuditoria} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
-                {loading ? '⏳ Cargando...' : '🔍 Buscar'}
+              <button onClick={cargarAuditoria} disabled={loading} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'Buscando...' : 'Buscar'}
               </button>
-              <button onClick={exportarCSV} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>
-                ⬇️ Exportar
+              <button onClick={exportarExcel} disabled={exportando || !datos.length} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: exportando ? 'wait' : 'pointer', opacity: (exportando || !datos.length) ? 0.5 : 1 }}>
+                {exportando ? 'Generando...' : 'Exportar a Excel'}
               </button>
             </div>
 
-            {filtrados.length === 0
+            {errorCarga && <div style={{ ...alertErr, marginBottom: 14 }}>{errorCarga}</div>}
+
+            {datos.length === 0
               ? <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: 14 }}>
                   {loading ? '⏳ Cargando registros...' : 'No hay registros en este período'}
                 </div>
@@ -323,19 +372,20 @@ export default function Auditoria() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Identificación', 'Nombre', 'Entrada', 'Salida'].map((h, i) => (
-                          <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, borderRadius: i === 0 ? '10px 0 0 0' : i === 3 ? '0 10px 0 0' : 0 }}>{h}</th>
+                        {['Identificación', 'Nombre', 'Fecha', 'Entrada', 'Salida'].map((h, i, arr) => (
+                          <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {filtrados.map((item, i) => (
+                      {datos.map((item, i) => (
                         <tr key={i}>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontWeight: 700 }}>{item.identificacion || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>{item.nombre || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#2e7d32', fontWeight: 600 }}>{formatHora(item.hora_entrada)}</td>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{item.fecha || '-'}</td>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#2e7d32', fontWeight: 600 }}>{item.hora_entrada || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: item.hora_salida ? '#c62828' : '#888', fontWeight: item.hora_salida ? 600 : 400 }}>
-                            {item.hora_salida ? formatHora(item.hora_salida) : 'Sin salida'}
+                            {item.hora_salida || 'Sin salida'}
                           </td>
                         </tr>
                       ))}

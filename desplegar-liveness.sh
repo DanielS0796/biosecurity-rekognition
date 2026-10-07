@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Despliega únicamente la pieza de Liveness Detection.
+# Despliega el Liveness Detection y el Lambda de auditoría.
 #
 # Por qué no un `terraform apply` normal: el estado de Terraform no conoce
 # los recursos que ya existen en AWS desde hace meses (tablas, colección,
@@ -112,6 +112,7 @@ echo " Paso 4 de 5 — aplicar solo los recursos de liveness"
 echo "──────────────────────────────────────────────────"
 
 terraform apply -auto-approve \
+  -target=aws_lambda_function.auditoria \
   -target=aws_lambda_function.liveness \
   -target=aws_iam_role_policy.lambda_liveness_policy \
   -target=aws_api_gateway_rest_api.api_liveness \
