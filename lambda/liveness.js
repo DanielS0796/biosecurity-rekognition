@@ -31,13 +31,8 @@ async function iniciarLiveness(event) {
   try {
     logStructured("INFO", "Iniciando sesión de Liveness Detection");
 
-    const params = {
-      Settings: {
-        OutputConfig: {
-          S3Bucket: `biosecurity-liveness-videos-${process.env.AWS_ACCOUNT_ID}`,
-        },
-      },
-    };
+    // Crear sesión sin OutputConfig para probar
+    const params = {};
 
     const command = new CreateFaceLivenessSessionCommand(params);
     const response = await rekognitionClient.send(command);
