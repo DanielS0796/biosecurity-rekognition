@@ -22,7 +22,7 @@ set -uo pipefail
 CUENTA="${CUENTA_AWS:-968481485339}"
 
 echo "──────────────────────────────────────────────────"
-echo " Paso 1 de 3 — adoptar recursos que ya existen"
+echo " Paso 1 de 4 — adoptar recursos que ya existen"
 echo "──────────────────────────────────────────────────"
 
 # Cada import es opcional: si el recurso ya está en el estado, se salta.
@@ -50,7 +50,50 @@ adoptar aws_s3_bucket.liveness_videos         "biosecurity-liveness-videos-${CUE
 
 echo
 echo "──────────────────────────────────────────────────"
-echo " Paso 2 de 3 — aplicar solo los recursos de liveness"
+echo " Paso 2 de 4 — migrar direcciones viejas del estado"
+echo "──────────────────────────────────────────────────"
+
+# El primer intento de despliegue creó /liveness-init y /validar con los
+# nombres individuales del código anterior. Ahora esas rutas se declaran con
+# for_each, así que cambiaron de dirección en el estado. Renombrarlas evita
+# que Terraform intente crear en AWS algo que ya está ahí (error 409).
+migrar() {
+  local viejo="$1" nuevo="$2"
+  local lista
+  lista=$(terraform state list 2>/dev/null)
+  if ! grep -qxF "$viejo" <<< "$lista"; then
+    return 0
+  fi
+  if grep -qxF "$nuevo" <<< "$lista"; then
+    echo "  destino ocupado, se descarta el viejo   $viejo"
+    terraform state rm -no-color "$viejo" >/dev/null 2>&1
+    return 0
+  fi
+  if terraform state mv -no-color "$viejo" "$nuevo" >/dev/null 2>&1; then
+    echo "  migrado   $viejo"
+  else
+    echo "  no se pudo migrar   $viejo"
+  fi
+}
+
+migrar 'aws_api_gateway_resource.liveness_init'                      'aws_api_gateway_resource.liveness["liveness-init"]'
+migrar 'aws_api_gateway_resource.liveness_validar'                   'aws_api_gateway_resource.liveness["validar"]'
+migrar 'aws_api_gateway_method.liveness_init_post'                   'aws_api_gateway_method.liveness_post["liveness-init"]'
+migrar 'aws_api_gateway_method.liveness_validar_post'                'aws_api_gateway_method.liveness_post["validar"]'
+migrar 'aws_api_gateway_method.liveness_init_options'                'aws_api_gateway_method.liveness_options["liveness-init"]'
+migrar 'aws_api_gateway_method.liveness_validar_options'             'aws_api_gateway_method.liveness_options["validar"]'
+migrar 'aws_api_gateway_integration.liveness_init_lambda'            'aws_api_gateway_integration.liveness_post["liveness-init"]'
+migrar 'aws_api_gateway_integration.liveness_validar_lambda'         'aws_api_gateway_integration.liveness_post["validar"]'
+migrar 'aws_api_gateway_integration.liveness_init_options'           'aws_api_gateway_integration.liveness_options["liveness-init"]'
+migrar 'aws_api_gateway_integration.liveness_validar_options'        'aws_api_gateway_integration.liveness_options["validar"]'
+migrar 'aws_api_gateway_method_response.liveness_init_options_200'    'aws_api_gateway_method_response.liveness_options["liveness-init"]'
+migrar 'aws_api_gateway_method_response.liveness_validar_options_200' 'aws_api_gateway_method_response.liveness_options["validar"]'
+migrar 'aws_api_gateway_integration_response.liveness_init_options'   'aws_api_gateway_integration_response.liveness_options["liveness-init"]'
+migrar 'aws_api_gateway_integration_response.liveness_validar_options' 'aws_api_gateway_integration_response.liveness_options["validar"]'
+
+echo
+echo "──────────────────────────────────────────────────"
+echo " Paso 3 de 4 — aplicar solo los recursos de liveness"
 echo "──────────────────────────────────────────────────"
 
 terraform apply -auto-approve \
@@ -80,7 +123,7 @@ fi
 
 echo
 echo "──────────────────────────────────────────────────"
-echo " Paso 3 de 3 — valores para el frontend"
+echo " Paso 4 de 4 — valores para el frontend"
 echo "──────────────────────────────────────────────────"
 echo
 POOL=$(terraform output -raw liveness_identity_pool_id 2>/dev/null)

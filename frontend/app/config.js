@@ -11,7 +11,8 @@
 export const AWS_REGION = "us-east-1";
 
 export const COGNITO_IDENTITY_POOL_ID =
-  process.env.NEXT_PUBLIC_IDENTITY_POOL_ID || "PENDIENTE_DE_TERRAFORM";
+  process.env.NEXT_PUBLIC_IDENTITY_POOL_ID ||
+  "us-east-1:149406a3-0574-4809-bde0-b75dd065d1df";
 
 export const API_LIVENESS_INIT =
   "https://h1jhziuxw4.execute-api.us-east-1.amazonaws.com/prod/liveness-init";
