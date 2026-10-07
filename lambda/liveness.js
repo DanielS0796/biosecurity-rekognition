@@ -1,6 +1,6 @@
 const { RekognitionClient, CreateFaceLivenessSessionCommand, GetFaceLivenessSessionResultsCommand, SearchFacesByImageCommand } = require("@aws-sdk/client-rekognition");
 const { DynamoDBClient, PutItemCommand, GetItemCommand, QueryCommand } = require("@aws-sdk/client-dynamodb");
-const * as Sentry = require("@sentry/aws-serverless");
+const Sentry = require("@sentry/aws-serverless");
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN || "https://examplePublicKey@o0.ingest.sentry.io/0",
