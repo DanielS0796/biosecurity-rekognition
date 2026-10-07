@@ -174,7 +174,7 @@ resource "aws_rekognition_collection" "coleccion" {
 # DynamoDB
 # ─────────────────────────────────────────
 resource "aws_dynamodb_table" "empleados" {
-  table_name     = "biosecurity-empleados"
+  name             = "biosecurity-empleados"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "identificacion"
   attribute {
@@ -185,7 +185,7 @@ resource "aws_dynamodb_table" "empleados" {
 }
 
 resource "aws_dynamodb_table" "retirados" {
-  table_name     = "biosecurity-retirados"
+  name             = "biosecurity-retirados"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "identificacion"
   attribute {
@@ -196,7 +196,7 @@ resource "aws_dynamodb_table" "retirados" {
 }
 
 resource "aws_dynamodb_table" "accesos" {
-  table_name     = "biosecurity-accesos"
+  name             = "biosecurity-accesos"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id_acceso"
   range_key    = "fecha_hora"
@@ -665,7 +665,7 @@ output "kms_key_id" {
 # DynamoDB - Reset codes y usuarios
 # ─────────────────────────────────────────
 resource "aws_dynamodb_table" "reset_codes" {
-  table_name     = "biosecurity-reset-codes"
+  name             = "biosecurity-reset-codes"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "email"
   attribute {
@@ -676,7 +676,7 @@ resource "aws_dynamodb_table" "reset_codes" {
 }
 
 resource "aws_dynamodb_table" "usuarios" {
-  table_name     = "biosecurity-usuarios"
+  name             = "biosecurity-usuarios"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "email"
   attribute {
