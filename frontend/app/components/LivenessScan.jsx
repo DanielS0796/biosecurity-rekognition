@@ -30,6 +30,7 @@ import {
  *   proposito      "registro" | "validacion"
  *   identificacion cédula (obligatoria para registro)
  *   nombre         nombre del empleado (obligatorio para registro)
+ *   sinDestellos   omite la secuencia de luces (vía para fotosensibles)
  *   onExito        (datos) => void   resultado del backend
  *   onFallo        (mensaje) => void
  *   onCancelar     () => void
@@ -52,11 +53,16 @@ function configurarAmplify() {
 
 const TEXTOS = {
   // Pantalla inicial
+  // Esta advertencia la trae AWS por omisión y es deliberada: los destellos
+  // pueden desencadenar crisis en personas con epilepsia fotosensible. La
+  // traducción conserva el texto completo del original, incluida la mención
+  // explícita a las convulsiones.
   photosensitivityWarningHeadingText: 'Advertencia de fotosensibilidad',
   photosensitivityWarningBodyText:
-    'Esta verificación muestra luces de colores. Tenga precaución si es sensible a la luz.',
-  photosensitivityWarningInfoText: 'Más información',
-  photosensitivityWarningLabelText: 'Advertencia de fotosensibilidad',
+    'Esta verificación emite destellos de distintos colores. Proceda con precaución si usted es fotosensible.',
+  photosensitivityWarningInfoText:
+    'Algunas personas pueden sufrir convulsiones epilépticas al exponerse a luces de colores. Proceda con precaución si usted, o alguien de su familia, tiene una condición epiléptica.',
+  photosensitivityWarningLabelText: 'Más información sobre fotosensibilidad',
   goodFitCaptionText: 'Posición correcta',
   goodFitAltText: 'Rostro centrado dentro del óvalo',
   tooFarCaptionText: 'Demasiado lejos',
@@ -120,6 +126,7 @@ export default function LivenessScan({
   proposito = 'validacion',
   identificacion = '',
   nombre = '',
+  sinDestellos = false,
   onExito,
   onFallo,
   onCancelar,
@@ -149,7 +156,7 @@ export default function LivenessScan({
         const r = await fetch(API_LIVENESS_INIT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ proposito, identificacion, nombre }),
+          body: JSON.stringify({ proposito, identificacion, nombre, sin_destellos: sinDestellos }),
         })
         const data = await r.json()
 
@@ -165,7 +172,7 @@ export default function LivenessScan({
       }
       setCargando(false)
     })()
-  }, [proposito, identificacion, nombre])
+  }, [proposito, identificacion, nombre, sinDestellos])
 
   // Rekognition terminó de analizar el video. Le pedimos el veredicto al
   // backend, que es el único que puede consultarlo.

@@ -112,6 +112,9 @@ async function iniciarLiveness(event) {
     const proposito = body.proposito === "registro" ? "registro" : "validacion";
     const identificacion = (body.identificacion || "").trim();
     const nombre = (body.nombre || "").trim();
+    // Vía alternativa para personas fotosensibles, que AWS recomienda ofrecer:
+    // los destellos pueden desencadenar crisis en epilepsia fotosensible.
+    const sinDestellos = body.sin_destellos === true;
 
     if (proposito === "registro") {
         if (!identificacion || !nombre) {
@@ -135,7 +138,9 @@ async function iniciarLiveness(event) {
         }
     }
 
-    const desafio = proposito === "registro" ? DESAFIO_REGISTRO : DESAFIO_VALIDACION;
+    const desafio = sinDestellos
+        ? "FaceMovementChallenge"
+        : proposito === "registro" ? DESAFIO_REGISTRO : DESAFIO_VALIDACION;
     const respuesta = await crearSesionRekognition(desafio);
 
     const sessionId = respuesta.SessionId;
@@ -149,14 +154,17 @@ async function iniciarLiveness(event) {
             identificacion: { S: identificacion || "-" },
             nombre: { S: nombre || "-" },
             estado: { S: "pendiente" },
+            desafio: { S: desafio },
             created_at: { N: String(ahora) },
             expires_at: { N: String(ahora + 600) },
         },
     }));
 
-    log("INFO", "Sesión de liveness creada", { sessionId, proposito, identificacion });
+    log("INFO", "Sesión de liveness creada", {
+        sessionId, proposito, identificacion, desafio, sin_destellos: sinDestellos,
+    });
 
-    return responder(200, { codigo: 0, session_id: sessionId, proposito });
+    return responder(200, { codigo: 0, session_id: sessionId, proposito, desafio });
 }
 
 // ChallengePreferences llegó a la API en julio de 2025. Si el SDK que trae

@@ -28,3 +28,5 @@ Lo que se comprueba, en orden:
     crea igual con el desafío predeterminado.
 12. Un error que no es de validación (throttling, por ejemplo) se propaga en
     lugar de reintentarse.
+13. La vía para personas fotosensibles omite los destellos también en el
+    registro, y sin esa bandera el registro los mantiene.

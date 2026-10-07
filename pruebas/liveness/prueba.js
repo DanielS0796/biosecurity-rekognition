@@ -159,6 +159,32 @@ rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (() => {
 r = await post('/liveness-init', { proposito: 'validacion' });
 check('devuelve 500 sin reintentar en bucle', r.status === 500, `-> ${r.status}`);
 
+
+console.log('\n── 13. Vía alternativa para personas fotosensibles ──');
+reset();
+let tipo = null;
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
+  tipo = input?.Settings?.ChallengePreferences?.[0]?.Type;
+  return { SessionId: 's-fotosensible' };
+};
+r = await post('/liveness-init', {
+  proposito: 'registro', identificacion: '555', nombre: 'Sofía Rojas', sin_destellos: true });
+check('el registro omite los destellos cuando se pide',
+  tipo === 'FaceMovementChallenge', `-> ${tipo}`);
+check('informa el desafío usado', r.body.desafio === 'FaceMovementChallenge', JSON.stringify(r.body));
+const ses = dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-fotosensible'];
+check('queda registrado en la sesión', ses?.desafio?.S === 'FaceMovementChallenge');
+
+reset();
+tipo = null;
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
+  tipo = input?.Settings?.ChallengePreferences?.[0]?.Type;
+  return { SessionId: 's-normal' };
+};
+await post('/liveness-init', { proposito: 'registro', identificacion: '556', nombre: 'Iván Peña' });
+check('sin la bandera, el registro mantiene los destellos',
+  tipo === 'FaceMovementAndLightChallenge', `-> ${tipo}`);
+
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();

@@ -23,6 +23,9 @@ export default function RRHH() {
   // video verificado, no se captura en el navegador.
   const [pasoRegistro, setPasoRegistro] = useState('datos')
   const [resultadoRegistro, setResultadoRegistro] = useState(null)
+  // Los destellos del escaneo pueden desencadenar crisis en personas con
+  // epilepsia fotosensible. AWS recomienda ofrecer una vía sin luces.
+  const [sinDestellos, setSinDestellos] = useState(false)
 
   const [eliminarId, setEliminarId] = useState('')
   const [empleadoEncontrado, setEmpleadoEncontrado] = useState(null)
@@ -132,6 +135,7 @@ export default function RRHH() {
   function nuevoRegistro() {
     setIdentificacion('')
     setNombre('')
+    setSinDestellos(false)
     setResultadoRegistro(null)
     setRegErr('')
     setRegOk('')
@@ -454,9 +458,9 @@ export default function RRHH() {
             {pasoRegistro === 'datos' && (
               <>
                 <div style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 12, borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.5 }}>
-                  El empleado hará un escaneo en vivo: deberá centrar el rostro en el óvalo
-                  mientras la pantalla emite destellos de color. Una fotografía impresa o en
-                  otra pantalla no supera esta prueba.
+                  El empleado hará un escaneo en vivo: deberá centrar el rostro en el
+                  óvalo{sinDestellos ? '' : ' mientras la pantalla emite destellos de color'}.
+                  Una fotografía impresa o en otra pantalla no supera esta prueba.
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación</label>
@@ -466,6 +470,18 @@ export default function RRHH() {
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nombre completo</label>
                   <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} onKeyDown={e => e.key === 'Enter' && iniciarEscaneo()} />
                 </div>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16, padding: 12, background: '#fffaf0', borderRadius: 12, border: '1px solid #f0c070', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={sinDestellos}
+                    onChange={e => setSinDestellos(e.target.checked)}
+                    style={{ marginTop: 2, width: 18, height: 18, flexShrink: 0, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 12, color: '#6b4a10', lineHeight: 1.5 }}>
+                    <strong>La persona es fotosensible o tiene epilepsia.</strong> Se omiten
+                    los destellos de color del escaneo. Pregúntelo antes de empezar.
+                  </span>
+                </label>
                 <button style={btnPrimary} onClick={iniciarEscaneo} disabled={!identificacion.trim() || !nombre.trim()}>
                   Iniciar escaneo facial
                 </button>
@@ -482,6 +498,7 @@ export default function RRHH() {
                   proposito="registro"
                   identificacion={identificacion.trim()}
                   nombre={nombre.trim()}
+                  sinDestellos={sinDestellos}
                   onExito={registroExitoso}
                   onFallo={registroFallido}
                   onCancelar={cancelarEscaneo}
