@@ -1,7 +1,15 @@
+# Dependencias — se instalan con npm install, no se versionan.
+# El Lambda se empaqueta con source_dir, así que hay que correr
+# `npm install` dentro de lambda/ antes de un terraform apply.
+node_modules/
+
+# Terraform
 .terraform/
 terraform.tfstate
 terraform.tfstate.backup
 lambda_build/
+
+# Artefactos
 *.zip
 *.bundle
-*.bundle
+.next/

@@ -22,7 +22,22 @@ set -uo pipefail
 CUENTA="${CUENTA_AWS:-968481485339}"
 
 echo "──────────────────────────────────────────────────"
-echo " Paso 1 de 4 — adoptar recursos que ya existen"
+echo " Paso 1 de 5 — dependencias del Lambda"
+echo "──────────────────────────────────────────────────"
+
+# El Lambda se empaqueta con source_dir, así que node_modules tiene que
+# existir antes del apply. No se versiona: se instala acá.
+if [ -f lambda/package.json ]; then
+  ( cd lambda && npm install --omit=dev --no-audit --no-fund ) \
+    && echo "  dependencias listas" \
+    || { echo "  falló npm install en lambda/ — el zip saldría incompleto"; exit 1; }
+else
+  echo "  no hay lambda/package.json, se omite"
+fi
+
+echo
+echo "──────────────────────────────────────────────────"
+echo " Paso 2 de 5 — adoptar recursos que ya existen"
 echo "──────────────────────────────────────────────────"
 
 # Cada import es opcional: si el recurso ya está en el estado, se salta.
@@ -50,7 +65,7 @@ adoptar aws_s3_bucket.liveness_videos         "biosecurity-liveness-videos-${CUE
 
 echo
 echo "──────────────────────────────────────────────────"
-echo " Paso 2 de 4 — migrar direcciones viejas del estado"
+echo " Paso 3 de 5 — migrar direcciones viejas del estado"
 echo "──────────────────────────────────────────────────"
 
 # El primer intento de despliegue creó /liveness-init y /validar con los
@@ -93,7 +108,7 @@ migrar 'aws_api_gateway_integration_response.liveness_validar_options' 'aws_api_
 
 echo
 echo "──────────────────────────────────────────────────"
-echo " Paso 3 de 4 — aplicar solo los recursos de liveness"
+echo " Paso 4 de 5 — aplicar solo los recursos de liveness"
 echo "──────────────────────────────────────────────────"
 
 terraform apply -auto-approve \
@@ -123,7 +138,7 @@ fi
 
 echo
 echo "──────────────────────────────────────────────────"
-echo " Paso 4 de 4 — valores para el frontend"
+echo " Paso 5 de 5 — valores para el frontend"
 echo "──────────────────────────────────────────────────"
 echo
 POOL=$(terraform output -raw liveness_identity_pool_id 2>/dev/null)
