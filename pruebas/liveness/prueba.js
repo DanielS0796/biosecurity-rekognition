@@ -1,7 +1,8 @@
+require('./preparar.js');
 const rek = require('@aws-sdk/client-rekognition');
 const dyn = require('@aws-sdk/client-dynamodb');
 process.env.BUCKET_AUDITORIA = '';
-const { handler } = require('./liveness.js');
+const { handler } = require('./liveness.actual.js');
 
 const ev = (ruta, cuerpo) => ({ path: ruta, httpMethod: 'POST', body: JSON.stringify(cuerpo) });
 const post = async (ruta, cuerpo) => { const r = await handler(ev(ruta, cuerpo)); return { status: r.statusCode, body: JSON.parse(r.body || '{}') }; };

@@ -1,7 +1,15 @@
 # Pruebas del Lambda de liveness
 
-Verifican la lógica del Lambda sin tocar AWS: los clientes de Rekognition y
-DynamoDB están reemplazados por dobles en `node_modules/`.
+Verifican la lógica de `lambda/liveness.js` sin tocar AWS.
+
+`preparar.js` corre al arrancar y hace dos cosas. Copia los dobles de
+Rekognition y DynamoDB desde `dobles/` hacia `node_modules/`, que es donde
+`require()` los busca — `node_modules` no se versiona, así que esto mantiene
+las pruebas reproducibles después de un clon. Y trae una copia fresca del
+Lambda, porque Node resuelve los `require()` desde la ubicación del archivo
+que los hace y el Lambda solo ve los dobles si se ejecuta desde esta
+carpeta. Al copiarlo en cada corrida, las pruebas no pueden pasar contra
+código viejo.
 
 ```bash
 cd pruebas/liveness && node prueba.js
