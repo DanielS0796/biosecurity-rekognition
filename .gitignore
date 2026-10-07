@@ -4,3 +4,4 @@ terraform.tfstate.backup
 lambda_build/
 *.zip
 *.bundle
+*.bundle
