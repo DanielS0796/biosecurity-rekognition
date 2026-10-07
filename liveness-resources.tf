@@ -61,10 +61,6 @@ resource "aws_dynamodb_table" "liveness_sessions" {
     enabled        = true
   }
 
-  stream_specification {
-    stream_view_type = "NEW_AND_OLD_IMAGES"
-  }
-
   tags = {
     Name        = "Liveness Sessions"
     Environment = "production"
