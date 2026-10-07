@@ -23,6 +23,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "liveness_videos_lifecycle" {
     id     = "delete-old-videos"
     status = "Enabled"
 
+    filter {}
+
     expiration {
       days = 7
     }
@@ -48,9 +50,6 @@ resource "aws_dynamodb_table" "liveness_sessions" {
   name           = "biosecurity-liveness-sessions"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "session_id"
-  stream_specification {
-    stream_view_type = "NEW_AND_OLD_IMAGES"
-  }
 
   attribute {
     name = "session_id"
@@ -60,6 +59,10 @@ resource "aws_dynamodb_table" "liveness_sessions" {
   ttl {
     attribute_name = "expires_at"
     enabled        = true
+  }
+
+  stream_specification {
+    stream_view_type = "NEW_AND_OLD_IMAGES"
   }
 
   tags = {
