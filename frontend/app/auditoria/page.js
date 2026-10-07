@@ -3,7 +3,6 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
-import LivenessScan from '../components/LivenessScan'
 
 export default function Auditoria() {
   const [logueado, setLogueado] = useState(false)
@@ -17,14 +16,6 @@ export default function Auditoria() {
   const [loading, setLoading] = useState(false)
   const [fechaDesde, setFechaDesde] = useState(() => new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0])
   const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0])
-
-  // Validación de acceso por escaneo de persona viva.
-  // No se pide la cédula: el rostro identifica a la persona contra la
-  // colección de Rekognition, y el backend decide con la imagen que AWS
-  // extrae del video verificado.
-  const [escaneando, setEscaneando] = useState(false)
-  const [resultadoAcceso, setResultadoAcceso] = useState(null)
-  const [errorAcceso, setErrorAcceso] = useState('')
 
   const [resetModal, setResetModal] = useState(false)
   const [resetPaso, setResetPaso] = useState(1)
@@ -164,36 +155,6 @@ export default function Auditoria() {
       } else setResetErr(body.descripcion || 'Error al cambiar contraseña')
     } catch { setResetErr('⚠️ Error de conexión') }
     setResetLoading(false)
-  }
-
-  // ── Validación de acceso por escaneo de persona viva ──────────
-  // El componente de Amplify corre el escaneo contra Rekognition; el
-  // backend resuelve quién es y registra la entrada o la salida.
-
-  function abrirEscaneo() {
-    setResultadoAcceso(null)
-    setErrorAcceso('')
-    setEscaneando(true)
-  }
-
-  function accesoValidado(datos) {
-    setResultadoAcceso(datos)
-    setEscaneando(false)
-    cargarAuditoria()
-  }
-
-  function accesoRechazado(mensaje) {
-    setErrorAcceso(mensaje)
-    setEscaneando(false)
-  }
-
-  function cerrarEscaneo() {
-    setEscaneando(false)
-  }
-
-  function limpiarResultado() {
-    setResultadoAcceso(null)
-    setErrorAcceso('')
   }
 
   const cardStyle = { background: 'rgba(255,255,255,0.75)', borderRadius: 20, padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.4)' }
@@ -384,69 +345,6 @@ export default function Auditoria() {
             }
           </div>
 
-          {/* VALIDACIÓN BIOMÉTRICA CON LIVENESS */}
-          <div style={cardStyle}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)', marginBottom: 6 }}>Validación de acceso</div>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>
-              Escaneo facial en vivo. El rostro identifica a la persona y queda el registro de entrada o salida.
-            </div>
-
-            {!escaneando && !resultadoAcceso && !errorAcceso && (
-              <>
-                <div style={{ marginBottom: 14, padding: 12, background: '#f0f4ff', borderRadius: 12, borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.5 }}>
-                  Centre el rostro en el óvalo mientras la pantalla emite destellos de color.
-                  Una fotografía impresa o mostrada en otra pantalla no supera la prueba.
-                </div>
-                <button onClick={abrirEscaneo} style={btnPrimary}>
-                  Escanear rostro
-                </button>
-              </>
-            )}
-
-            {escaneando && (
-              <>
-                <LivenessScan
-                  proposito="validacion"
-                  onExito={accesoValidado}
-                  onFallo={accesoRechazado}
-                  onCancelar={cerrarEscaneo}
-                />
-                <button onClick={cerrarEscaneo} style={{ width: '100%', marginTop: 12, padding: 12, border: '2px solid #ddd', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  Cancelar
-                </button>
-              </>
-            )}
-
-            {resultadoAcceso && (
-              <div style={{ padding: 16, borderRadius: 12, background: '#e8f5e9', border: '2px solid #2e7d32' }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#2e7d32', marginBottom: 8 }}>
-                  {resultadoAcceso.mensaje}, {resultadoAcceso.nombre}
-                </div>
-                <div style={{ fontSize: 13, color: '#1b5e20', marginBottom: 3 }}>
-                  {resultadoAcceso.tipo_acceso} · CC {resultadoAcceso.identificacion}
-                </div>
-                <div style={{ fontSize: 12, color: '#1b5e20', marginBottom: 3 }}>
-                  Coincidencia del rostro: <strong>{resultadoAcceso.similitud}%</strong>
-                </div>
-                <div style={{ fontSize: 12, color: '#1b5e20' }}>
-                  Confianza del escaneo: <strong>{resultadoAcceso.confianza_liveness}%</strong>
-                </div>
-                <button onClick={limpiarResultado} style={{ width: '100%', marginTop: 12, padding: 10, border: 'none', borderRadius: 10, background: '#2e7d32', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                  Nuevo escaneo
-                </button>
-              </div>
-            )}
-
-            {errorAcceso && (
-              <div style={{ padding: 16, borderRadius: 12, background: '#fdecea', border: '2px solid #c62828' }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#c62828', marginBottom: 6 }}>Acceso no autorizado</div>
-                <div style={{ fontSize: 12, color: '#b71c1c', lineHeight: 1.5 }}>{errorAcceso}</div>
-                <button onClick={limpiarResultado} style={{ width: '100%', marginTop: 12, padding: 10, border: 'none', borderRadius: 10, background: '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                  Intentar de nuevo
-                </button>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* FOOTER */}

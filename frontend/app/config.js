@@ -22,6 +22,11 @@ export const API_LIVENESS_RESULT =
 // ─────────────────────────────────────────────────────────────
 // APIs existentes
 // ─────────────────────────────────────────────────────────────
+// OBSOLETO — ninguna página lo usa desde que el acceso pasó a liveness.
+// Este endpoint recibe una imagen en el cuerpo y registra el acceso sin
+// comprobar que haya una persona real: una fotografía lo supera. Sigue
+// activo en AWS, así que conviene deshabilitarlo (quitar el stage o el
+// despliegue del API 9bm7r0q9wi) para cerrar esa vía.
 export const API_VALIDAR   = "https://9bm7r0q9wi.execute-api.us-east-1.amazonaws.com/best/validar";
 export const API_RRHH_URL  = "https://uadjcukyx1.execute-api.us-east-1.amazonaws.com/prod/registrar";
 export const API_AUDITORIA = "https://3tqg18yo1l.execute-api.us-east-1.amazonaws.com/prod/reporte";
