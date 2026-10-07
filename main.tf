@@ -174,7 +174,7 @@ resource "aws_rekognition_collection" "coleccion" {
 # DynamoDB
 # ─────────────────────────────────────────
 resource "aws_dynamodb_table" "empleados" {
-  name         = "biosecurity-empleados"
+  table_name     = "biosecurity-empleados"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "identificacion"
   attribute {
@@ -185,7 +185,7 @@ resource "aws_dynamodb_table" "empleados" {
 }
 
 resource "aws_dynamodb_table" "retirados" {
-  name         = "biosecurity-retirados"
+  table_name     = "biosecurity-retirados"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "identificacion"
   attribute {
@@ -196,7 +196,7 @@ resource "aws_dynamodb_table" "retirados" {
 }
 
 resource "aws_dynamodb_table" "accesos" {
-  name         = "biosecurity-accesos"
+  table_name     = "biosecurity-accesos"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "id_acceso"
   range_key    = "fecha_hora"
@@ -582,8 +582,8 @@ resource "aws_cognito_user_pool" "biosecurity" {
 }
 
 resource "aws_cognito_user_pool_client" "biosecurity_client" {
-  name         = "biosecurity-web-client"
-  user_pool_id = aws_cognito_user_pool.biosecurity.id
+  name            = "biosecurity-web-client"
+  user_pool_id    = aws_cognito_user_pool.biosecurity.id
 
   explicit_auth_flows = [
     "ALLOW_USER_PASSWORD_AUTH",
@@ -665,7 +665,7 @@ output "kms_key_id" {
 # DynamoDB - Reset codes y usuarios
 # ─────────────────────────────────────────
 resource "aws_dynamodb_table" "reset_codes" {
-  name         = "biosecurity-reset-codes"
+  table_name     = "biosecurity-reset-codes"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "email"
   attribute {
@@ -676,7 +676,7 @@ resource "aws_dynamodb_table" "reset_codes" {
 }
 
 resource "aws_dynamodb_table" "usuarios" {
-  name         = "biosecurity-usuarios"
+  table_name     = "biosecurity-usuarios"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "email"
   attribute {
