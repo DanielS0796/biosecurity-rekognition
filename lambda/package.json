@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-rekognition": "^3.1147.0",
     "@sentry/aws-serverless": "^10.53.1",
     "exceljs": "^4.4.0",
     "nodemailer": "^8.0.5"

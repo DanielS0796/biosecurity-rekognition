@@ -22,3 +22,9 @@ Lo que se comprueba, en orden:
 7. Una cédula ya registrada falla antes de hacer pasar a nadie por el escaneo.
 8. El registro exige identificación y nombre.
 9. Una persona real pero no registrada queda negada y con rastro en auditoría.
+10. Cada propósito pide su desafío: la entrada sin destellos, el registro con
+    destellos.
+11. Si el SDK del runtime no aceptara `ChallengePreferences`, la sesión se
+    crea igual con el desafío predeterminado.
+12. Un error que no es de validación (throttling, por ejemplo) se propaga en
+    lugar de reintentarse.

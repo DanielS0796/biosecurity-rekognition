@@ -44,6 +44,11 @@ resource "aws_lambda_function" "liveness" {
       UMBRAL_LIVENESS  = "85"
       UMBRAL_SIMILITUD = "95"
       UMBRAL_DUPLICADO = "90"
+
+      # El registro crea la identidad: destellos incluidos, máxima precisión.
+      # La entrada prioriza rapidez: solo el óvalo, unos 3 segundos menos.
+      DESAFIO_REGISTRO   = "FaceMovementAndLightChallenge"
+      DESAFIO_VALIDACION = "FaceMovementChallenge"
     }
   }
 

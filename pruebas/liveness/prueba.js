@@ -113,6 +113,52 @@ const reg = Object.values(dyn.__estado.tablas['biosecurity-accesos'] || {});
 check('deja el intento en auditoría',
   reg.some(i => i.identificacion.S === 'DESCONOCIDO' && i.resultado.S === 'RECHAZADO'));
 
+
+console.log('\n── 10. Desafío según el propósito ──');
+reset();
+let pedido = null;
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
+  pedido = input?.Settings?.ChallengePreferences?.[0]?.Type;
+  return { SessionId: 's-desafio' };
+};
+await post('/liveness-init', { proposito: 'validacion' });
+check('la entrada pide el desafío sin destellos',
+  pedido === 'FaceMovementChallenge', `-> ${pedido}`);
+
+reset();
+pedido = null;
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
+  pedido = input?.Settings?.ChallengePreferences?.[0]?.Type;
+  return { SessionId: 's-desafio2' };
+};
+await post('/liveness-init', { proposito: 'registro', identificacion: '777', nombre: 'Marta Ruiz' });
+check('el registro pide el desafío con destellos',
+  pedido === 'FaceMovementAndLightChallenge', `-> ${pedido}`);
+
+console.log('\n── 11. Reserva si el SDK no acepta ChallengePreferences ──');
+reset();
+let intentos = [];
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
+  intentos.push(input?.Settings?.ChallengePreferences ? 'con-preferencia' : 'sin-preferencia');
+  if (intentos.length === 1) {
+    const e = new Error('Unknown parameter ChallengePreferences');
+    e.name = 'ValidationException';
+    throw e;
+  }
+  return { SessionId: 's-reserva' };
+};
+r = await post('/liveness-init', { proposito: 'validacion' });
+check('reintenta sin el parámetro', intentos.join(',') === 'con-preferencia,sin-preferencia', intentos.join(','));
+check('la sesión se crea igual', r.body.session_id === 's-reserva', JSON.stringify(r.body));
+
+console.log('\n── 12. Un error que no es de validación sí se propaga ──');
+reset();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (() => {
+  const e = new Error('Rate exceeded'); e.name = 'ThrottlingException'; return e;
+})();
+r = await post('/liveness-init', { proposito: 'validacion' });
+check('devuelve 500 sin reintentar en bucle', r.status === 500, `-> ${r.status}`);
+
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();

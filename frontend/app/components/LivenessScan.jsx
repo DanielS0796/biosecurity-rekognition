@@ -14,10 +14,12 @@ import {
 /**
  * Escaneo de persona viva con AWS Rekognition Face Liveness.
  *
- * El componente de Amplify abre la cámara y transmite video en vivo
- * directo a Rekognition, que ejecuta los desafíos (centrar el rostro en el
- * óvalo y una secuencia de destellos de color). Una foto impresa o en
- * pantalla no pasa: no responde a los destellos ni tiene profundidad.
+ * El componente de Amplify abre la cámara y transmite video en vivo directo
+ * a Rekognition, que ejecuta el desafío correspondiente. El tipo de desafío
+ * lo decide el backend al crear la sesión y el componente adapta su interfaz
+ * solo: con destellos de color en el registro, y solo el óvalo en la entrada
+ * para que sea más rápida. Una foto impresa o en pantalla no pasa ninguno de
+ * los dos.
  *
  * El resultado NO se decide en el navegador. Cuando el análisis termina,
  * este componente solo le avisa al backend con el session_id; el Lambda

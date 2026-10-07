@@ -93,9 +93,9 @@ export default function Home() {
             {!escaneando && !resultado && (
               <>
                 <div style={{ width: '100%', marginBottom: 16, padding: 14, background: '#f0f4ff', borderRadius: 14, borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.6 }}>
-                  Centre el rostro en el óvalo mientras la pantalla emite destellos
-                  de color. El sistema comprueba que haya una persona real frente a
-                  la cámara, así que una fotografía no sirve.
+                  Centre el rostro en el óvalo y sosténgalo unos segundos. El
+                  sistema comprueba que haya una persona real frente a la cámara,
+                  así que una fotografía no sirve.
                 </div>
                 <button onClick={abrirEscaneo} style={{ width: '100%', maxWidth: 320, padding: 16, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 15px rgba(240,90,34,0.35)' }}>
                   Validar acceso
