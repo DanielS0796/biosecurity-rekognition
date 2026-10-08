@@ -1,7 +1,13 @@
 const enviados = [];
+
+// El transporte se expone para que una prueba pueda hacerlo fallar y
+// comprobar qué pasa cuando el correo no sale.
+const transporte = {
+  sendMail: async (m) => { enviados.push(m); return { messageId: 'doble' }; },
+};
+
 module.exports = {
   __enviados: enviados,
-  createTransport: () => ({
-    sendMail: async (m) => { enviados.push(m); return { messageId: 'doble' }; },
-  }),
+  __transporte: transporte,
+  createTransport: () => transporte,
 };

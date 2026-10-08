@@ -35,6 +35,16 @@ const reset = () => {
 };
 const CLAVE_OK = 'Ucomp2026!Seg';
 
+/**
+ * Saca la contraseña temporal del HTML del correo. El Lambda ya no la
+ * devuelve en la respuesta, así que el correo es el único lugar de donde
+ * se puede leer — igual que para la persona que la recibe.
+ */
+function extraerTemporal(html) {
+  const m = html.match(/font-family:monospace[^>]*>([^<]+)</);
+  return m ? m[1].trim() : null;
+}
+
 (async () => {
 
 console.log('\n── 1. Contraseñas guardadas hasheadas, nunca en claro ──');
@@ -43,14 +53,20 @@ let r = await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.te
 check('crea el usuario', r.body.codigo === 0, JSON.stringify(r.body));
 const guardada = dyn.__estado.usuarios['ana'].password.S;
 check('lo guardado es un hash scrypt', guardada.startsWith('scrypt$'), guardada.slice(0, 20));
-const temporal = r.body.clave_temporal;
-check('devuelve la temporal una sola vez', typeof temporal === 'string' && temporal.length >= 12);
-check('la temporal no está en el registro', !JSON.stringify(dyn.__estado.usuarios['ana']).includes(temporal));
+check('la respuesta no trae la contraseña', !JSON.stringify(r.body).match(/clave_temporal/));
+check('confirma el correo enmascarado', r.body.correo_enmascarado === 'an*@x.test',
+  r.body.correo_enmascarado);
 
-console.log('\n── 2. El correo de bienvenida ya no lleva la contraseña ──');
-check('se envió el correo', mail.__enviados.length === 1);
-check('no contiene la temporal', !mail.__enviados[0].html.includes(temporal));
-check('explica que la entrega el administrador', /no se envía por correo/i.test(mail.__enviados[0].html));
+console.log('\n── 2. La temporal viaja por correo y solo por ahí ──');
+check('se envió un correo', mail.__enviados.length === 1);
+check('fue al correo del usuario', mail.__enviados[0].to === 'ana@x.test');
+// La temporal se recupera del correo, que es el único lugar donde está.
+const temporal = extraerTemporal(mail.__enviados[0].html);
+check('el correo lleva una temporal', typeof temporal === 'string' && temporal.length >= 12,
+  String(temporal));
+check('no quedó en claro en el registro',
+  !JSON.stringify(dyn.__estado.usuarios['ana']).includes(temporal));
+check('el correo avisa que vence', /vence en \d+ horas/i.test(mail.__enviados[0].html));
 
 console.log('\n── 3. Primer ingreso obliga a cambiar la contraseña ──');
 r = await pedir({ accion: 'login', email: 'ana', clave: temporal });
@@ -160,6 +176,75 @@ check('descarta el rol inventado', dyn.__estado.usuarios['luis'].rol.S === 'rrhh
   dyn.__estado.usuarios['luis'].rol.S);
 await pedir({ accion: 'crear_usuario', usuario: 'eva', correo: 'e@x.test', rol: 'basura' });
 check('sin roles válidos cae en el mínimo', dyn.__estado.usuarios['eva'].rol.S === 'rrhh');
+
+console.log('\n── 13. Quien crea el usuario nunca ve la contraseña ──');
+reset();
+r = await pedir({ accion: 'crear_usuario', usuario: 'sol', correo: 'sol@x.test', rol: 'auditoria' });
+const temporalSol = extraerTemporal(mail.__enviados[0].html);
+const respuesta = JSON.stringify(r.body);
+check('la temporal no aparece en la respuesta', !respuesta.includes(temporalSol), respuesta);
+// Con la temporal en mano se entra, así que la que llegó por correo es la
+// que vale: la prueba anterior no pasa por omisión.
+r = await pedir({ accion: 'login', email: 'sol', clave: temporalSol });
+check('la del correo sí funciona', r.body.codigo === 0, JSON.stringify(r.body));
+check('y pide cambiarla', r.body.debe_cambiar_clave === true);
+
+console.log('\n── 14. La temporal vence sola ──');
+reset();
+await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
+const temporalAna = extraerTemporal(mail.__enviados[0].html);
+check('se guardó la fecha de vencimiento', !!dyn.__estado.usuarios['ana'].clave_temporal_expira);
+// Se mueve el vencimiento al pasado en vez de esperar 72 horas.
+dyn.__estado.usuarios['ana'].clave_temporal_expira = { S: new Date(Date.now() - 1000).toISOString() };
+r = await pedir({ accion: 'login', email: 'ana', clave: temporalAna });
+check('vencida no entra', r.status === 403, JSON.stringify(r.body));
+check('y lo dice claro', /venció/i.test(r.body.descripcion), r.body.descripcion);
+r = await pedir({ accion: 'cambiar_clave', email: 'ana', clave_actual: temporalAna, nueva_clave: CLAVE_OK });
+check('vencida tampoco sirve para cambiarla', r.status === 403, JSON.stringify(r.body));
+
+console.log('\n── 15. Elegir la contraseña propia borra el vencimiento ──');
+reset();
+await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
+const temporalViva = extraerTemporal(mail.__enviados[0].html);
+r = await pedir({ accion: 'cambiar_clave', email: 'ana', clave_actual: temporalViva, nueva_clave: CLAVE_OK });
+check('cambia bien', r.body.codigo === 0, JSON.stringify(r.body));
+check('devuelve el rol para entrar directo', JSON.stringify(r.body.rol) === '["rrhh"]',
+  JSON.stringify(r.body.rol));
+check('se borró el vencimiento', !dyn.__estado.usuarios['ana'].clave_temporal_expira,
+  JSON.stringify(dyn.__estado.usuarios['ana'].clave_temporal_expira));
+r = await pedir({ accion: 'login', email: 'ana', clave: CLAVE_OK });
+check('entra con la propia', r.body.codigo === 0 && r.body.debe_cambiar_clave === false);
+r = await pedir({ accion: 'login', email: 'ana', clave: temporalViva });
+check('la temporal ya no sirve', r.status === 401);
+
+console.log('\n── 16. Reenviar temporal invalida la anterior ──');
+reset();
+await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
+const primera = extraerTemporal(mail.__enviados[0].html);
+r = await pedir({ accion: 'reenviar_temporal', usuario: 'ana' });
+check('reenvía', r.body.codigo === 0, JSON.stringify(r.body));
+check('sin exponer la nueva', !JSON.stringify(r.body).includes(extraerTemporal(mail.__enviados[1].html)));
+const segunda = extraerTemporal(mail.__enviados[1].html);
+check('la nueva es distinta', segunda !== primera);
+check('avisa que la anterior murió', /anterior ya no funciona/i.test(mail.__enviados[1].html));
+r = await pedir({ accion: 'login', email: 'ana', clave: primera });
+check('la primera ya no entra', r.status === 401);
+r = await pedir({ accion: 'login', email: 'ana', clave: segunda });
+check('la segunda sí', r.body.codigo === 0, JSON.stringify(r.body));
+r = await pedir({ accion: 'reenviar_temporal', usuario: 'fantasma' });
+check('no reenvía a quien no existe', r.status === 404);
+r = await pedir({ accion: 'reenviar_temporal', usuario: 'rescate' });
+check('no toca al admin de emergencia', r.body.codigo === 1, r.body.descripcion);
+
+console.log('\n── 17. Si el correo no sale, el usuario no queda inaccesible ──');
+reset();
+const enviarOriginal = mail.__transporte.sendMail;
+mail.__transporte.sendMail = async () => { throw new Error('SMTP caído'); };
+r = await pedir({ accion: 'crear_usuario', usuario: 'nadie', correo: 'n@x.test', rol: 'rrhh' });
+check('responde que falló', r.status === 502, JSON.stringify(r.body));
+check('y no deja el usuario creado', !dyn.__estado.usuarios['nadie'],
+  JSON.stringify(dyn.__estado.usuarios['nadie']));
+mail.__transporte.sendMail = enviarOriginal;
 
 console.log(`\n${'─'.repeat(52)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);

@@ -25,7 +25,13 @@ class DynamoDBClient {
       // que en DynamoDB, y un alias sin declarar revienta acá, que es lo
       // que hace el servicio de verdad.
       const nombres = cmd.input.ExpressionAttributeNames || {};
-      const expr = cmd.input.UpdateExpression.replace(/^SET\s+/i, '');
+
+      // "SET a = :x, #b = :y REMOVE c" se parte en sus dos cláusulas.
+      const bruto = cmd.input.UpdateExpression;
+      const corte = bruto.search(/\sREMOVE\s/i);
+      const expr = (corte === -1 ? bruto : bruto.slice(0, corte)).replace(/^SET\s+/i, '');
+      const quitar = corte === -1 ? [] : bruto.slice(corte).replace(/^\s*REMOVE\s+/i, '').split(',');
+
       for (const parte of expr.split(',')) {
         const [crudo, ph] = parte.split('=').map(s => s.trim());
         let campo = crudo;
@@ -40,6 +46,10 @@ class DynamoDBClient {
         }
         item[campo] = cmd.input.ExpressionAttributeValues[ph];
       }
+      for (const crudo of quitar.map(x => x.trim()).filter(Boolean)) {
+        delete item[crudo.startsWith('#') ? nombres[crudo] : crudo];
+      }
+
       t[k] = item;
       return {};
     }

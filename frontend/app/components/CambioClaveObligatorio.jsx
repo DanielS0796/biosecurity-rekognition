@@ -14,7 +14,8 @@ import { API_RESET } from '../config'
  * Props:
  *   usuario       nombre de usuario que acaba de autenticarse
  *   claveActual   la temporal con la que entró, para probar el cambio
- *   onListo       se llama cuando la contraseña quedó cambiada
+ *   onListo       se llama con los roles del usuario cuando la contraseña
+ *                 quedó cambiada, para entrar sin repetir el login
  *   onCancelar    vuelve al login sin entrar
  */
 
@@ -65,7 +66,7 @@ export default function CambioClaveObligatorio({ usuario, claveActual, onListo, 
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
 
-      if (body.codigo === 0) onListo?.()
+      if (body.codigo === 0) onListo?.(body.rol || [])
       else setError(body.descripcion || 'No se pudo cambiar la contraseña')
     } catch (err) {
       setError('Error de conexión: ' + err.message)

@@ -43,16 +43,18 @@ export default function Auditoria() {
       })
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
-      if (body.codigo === 0 && body.rol.includes('auditoria')) {
-        if (body.debe_cambiar_clave) {
-          setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
-        } else {
+      // El cambio obligatorio va antes del rol: con una temporal hay que
+      // poder elegir contraseña aunque no se vaya a usar este módulo.
+      if (body.codigo === 0 && body.debe_cambiar_clave) {
+        setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
+      } else if (body.codigo === 0 && body.rol.includes('auditoria')) {
         setLogueado(true)
         setUsuarioActual(loginUser)
         cargarAuditoria()
-        }
+      } else if (body.codigo === 0) {
+        setLoginError('Tu usuario no tiene permiso para este módulo')
       } else {
-        setLoginError('Usuario o contraseña incorrectos')
+        setLoginError(body.descripcion || 'Usuario o contraseña incorrectos')
       }
     } catch { setLoginError('⚠️ Error de conexión') }
     setLoginLoading(false)
@@ -235,10 +237,17 @@ export default function Auditoria() {
     <CambioClaveObligatorio
       usuario={cambioPendiente.usuario}
       claveActual={cambioPendiente.clave}
-      onListo={() => {
+      onListo={(roles) => {
+        const usuario = cambioPendiente.usuario
         setCambioPendiente(null)
         setLoginPass('')
-        alert('Contraseña actualizada. Ingresa de nuevo con la contraseña que acabas de definir.')
+        if (roles.includes('auditoria')) {
+          setLogueado(true)
+          setUsuarioActual(usuario)
+          cargarAuditoria()
+        } else {
+          alert('Contraseña actualizada. Tu usuario no tiene permiso para este módulo.')
+        }
       }}
       onCancelar={() => { setCambioPendiente(null); setLoginPass('') }}
     />

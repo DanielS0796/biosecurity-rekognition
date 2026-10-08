@@ -798,6 +798,9 @@ resource "aws_lambda_function" "reset" {
       MODULE_NAME         = "reset"
       MAX_INTENTOS_CODIGO = "5"
 
+      # Horas que vive la contraseña temporal que se envía por correo.
+      HORAS_CLAVE_TEMPORAL = "72"
+
       # Credenciales fuera del código: antes vivían escritas en reset.js, que
       # está versionado. Los valores se pasan por terraform.tfvars, que no se
       # versiona.

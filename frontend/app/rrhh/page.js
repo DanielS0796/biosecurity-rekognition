@@ -50,7 +50,8 @@ export default function RRHH() {
   const [nuevoRoles, setNuevoRoles] = useState(['rrhh'])
   // La contraseña temporal la genera el servidor y se muestra una sola vez,
   // para entregarla en persona. No viaja por correo.
-  const [claveTemporal, setClaveTemporal] = useState(null)
+  const [avisoEnvio, setAvisoEnvio] = useState(null)
+  const [reenviando, setReenviando] = useState(null)
   const [crearOk, setCrearOk] = useState('')
   const [crearErr, setCrearErr] = useState('')
   const [crearLoading, setCrearLoading] = useState(false)
@@ -87,16 +88,22 @@ export default function RRHH() {
       })
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
-      if (body.codigo === 0 && body.rol.includes('rrhh')) {
-        if (body.debe_cambiar_clave) {
-          setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
-        } else {
+      // El cambio obligatorio se mira antes del rol: quien entra con una
+      // temporal tiene que poder elegir su contraseña aunque todavía no
+      // vaya a usar este módulo.
+      if (body.codigo === 0 && body.debe_cambiar_clave) {
+        setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
+      } else if (body.codigo === 0 && body.rol.includes('rrhh')) {
         setLogueado(true)
         setUsuarioActual(loginUser)
         setTimeout(() => { cargarUsuarios() }, 500)
-        }
+      } else if (body.codigo === 0) {
+        setLoginError('Tu usuario no tiene permiso para este módulo')
       } else {
-        setLoginError('Usuario o contraseña incorrectos')
+        // Una temporal vencida responde con su propio mensaje: repetir
+        // "usuario o contraseña incorrectos" mandaría a buscar el error
+        // donde no está.
+        setLoginError(body.descripcion || 'Usuario o contraseña incorrectos')
       }
     } catch {
       setLoginError('⚠️ Error de conexión')
@@ -230,7 +237,7 @@ export default function RRHH() {
       alerta(setCrearErr, 'Seleccione al menos un rol'); return
     }
     setCrearLoading(true)
-    setClaveTemporal(null)
+    setAvisoEnvio(null)
     try {
       const r = await fetch(API_RESET, {
         method: 'POST',
@@ -246,7 +253,11 @@ export default function RRHH() {
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
         playSound('success')
-        setClaveTemporal({ usuario: nuevoUsuario.trim(), clave: body.clave_temporal })
+        setAvisoEnvio({
+          usuario: nuevoUsuario.trim(),
+          correo: body.correo_enmascarado,
+          horas: body.horas_vigencia,
+        })
         setNuevoUsuario(''); setNuevoCorreo(''); setNuevoRoles(['rrhh'])
         cargarUsuarios()
       } else {
@@ -257,6 +268,35 @@ export default function RRHH() {
       alerta(setCrearErr, '⚠️ Error de conexión')
     }
     setCrearLoading(false)
+  }
+
+  async function reenviarTemporal(usuario) {
+    if (!confirm(
+      `Se le va a enviar una contraseña temporal nueva a ${usuario}.\n\n` +
+      'La anterior deja de funcionar de inmediato. ¿Continuar?'
+    )) return
+
+    setReenviando(usuario)
+    setAvisoEnvio(null)
+    try {
+      const r = await fetch(API_RESET, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion: 'reenviar_temporal', usuario }),
+      })
+      const data = await r.json()
+      const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
+      if (body.codigo === 0) {
+        playSound('success')
+        setAvisoEnvio({ usuario, correo: body.correo_enmascarado, horas: body.horas_vigencia })
+      } else {
+        playSound('error')
+        alerta(setCrearErr, body.descripcion || 'No se pudo reenviar')
+      }
+    } catch {
+      alerta(setCrearErr, '⚠️ Error de conexión')
+    }
+    setReenviando(null)
   }
 
   function alternarRol(rol) {
@@ -374,10 +414,17 @@ export default function RRHH() {
     <CambioClaveObligatorio
       usuario={cambioPendiente.usuario}
       claveActual={cambioPendiente.clave}
-      onListo={() => {
+      onListo={(roles) => {
+        const usuario = cambioPendiente.usuario
         setCambioPendiente(null)
         setLoginPass('')
-        alert('Contraseña actualizada. Ingresa de nuevo con la contraseña que acabas de definir.')
+        if (roles.includes('rrhh')) {
+          setLogueado(true)
+          setUsuarioActual(usuario)
+          setTimeout(() => { cargarUsuarios() }, 500)
+        } else {
+          alert('Contraseña actualizada. Tu usuario no tiene permiso para este módulo.')
+        }
       }}
       onCancelar={() => { setCambioPendiente(null); setLoginPass('') }}
     />
@@ -682,22 +729,24 @@ export default function RRHH() {
             {crearOk && <div style={{ ...alertOk, marginBottom: 10 }}>{crearOk}</div>}
             <button style={btnPrimary} onClick={crearUsuario} disabled={crearLoading}>{crearLoading ? '⏳ Creando...' : 'Crear usuario'}</button>
 
-            {claveTemporal && (
-              <div style={{ marginTop: 14, padding: 16, background: '#fffaf0', borderRadius: 12, border: '2px solid #f0a020' }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#8a5a00', marginBottom: 8 }}>
-                  Usuario {claveTemporal.usuario} creado
+            {avisoEnvio && (
+              <div style={{ marginTop: 14, padding: 16, background: '#f1f8f2', borderRadius: 12, border: '2px solid #2e7d32' }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#1b5e20', marginBottom: 8 }}>
+                  Usuario {avisoEnvio.usuario} creado
                 </div>
-                <div style={{ fontSize: 12, color: '#6b4a10', marginBottom: 10, lineHeight: 1.5 }}>
-                  Esta es la contraseña temporal. Anótela ahora y entréguesela en persona:
-                  no se vuelve a mostrar ni se envía por correo.
+                <div style={{ fontSize: 12.5, color: '#2c5530', lineHeight: 1.6 }}>
+                  La contraseña temporal se envió a <strong>{avisoEnvio.correo}</strong>.
+                  Vence en {avisoEnvio.horas} horas y solo sirve para que esa
+                  persona elija su propia contraseña.
                 </div>
-                <div style={{ padding: '12px 14px', background: '#fff', borderRadius: 8, border: '1px dashed #c08020', fontFamily: 'monospace', fontSize: 17, fontWeight: 700, letterSpacing: 1, textAlign: 'center', color: '#333', userSelect: 'all' }}>
-                  {claveTemporal.clave}
+                <div style={{ fontSize: 12, color: '#55705a', marginTop: 8, lineHeight: 1.5 }}>
+                  Nadie más la conoce, tú incluido. Si el correo no llega, usa
+                  "Reenviar contraseña" en la lista de abajo.
                 </div>
                 <button
-                  onClick={() => setClaveTemporal(null)}
-                  style={{ width: '100%', marginTop: 10, padding: 9, border: 'none', borderRadius: 8, background: '#8a5a00', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                  Ya la anoté, ocultar
+                  onClick={() => setAvisoEnvio(null)}
+                  style={{ width: '100%', marginTop: 12, padding: 9, border: 'none', borderRadius: 8, background: '#2e7d32', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  Entendido
                 </button>
               </div>
             )}
@@ -714,7 +763,16 @@ export default function RRHH() {
                   <div style={{ fontSize: 12, color: '#888' }}>{u.correo || 'Sin correo registrado'}</div>
                 </div>
                 {u.usuario !== usuarioActual
-                  ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>🗑️ Eliminar</button>
+                  ? <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button
+                        onClick={() => reenviarTemporal(u.usuario)}
+                        disabled={reenviando === u.usuario}
+                        title="Genera una contraseña temporal nueva y la envía a su correo"
+                        style={{ background: '#eef3fb', border: 'none', color: '#1A2D5A', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: reenviando === u.usuario ? 'wait' : 'pointer' }}>
+                        {reenviando === u.usuario ? '⏳' : '✉️ Reenviar contraseña'}
+                      </button>
+                      <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>🗑️ Eliminar</button>
+                    </div>
                   : <span style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>Tú</span>
                 }
               </div>

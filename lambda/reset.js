@@ -21,6 +21,13 @@ const ROLES_VALIDOS = ["rrhh", "auditoria"];
 // la cuenta.
 const MAX_INTENTOS_CODIGO = Number(process.env.MAX_INTENTOS_CODIGO || 5);
 
+// Horas que vive la contraseña temporal. No es "de un solo uso" en el
+// sentido literal de morir al primer login: si muriera ahí, cerrar la
+// pestaña antes de elegir la propia dejaría al usuario fuera y habría que
+// recrearlo. Sirve para una sola cosa —definir la contraseña propia— y
+// vence sola.
+const HORAS_CLAVE_TEMPORAL = Number(process.env.HORAS_CLAVE_TEMPORAL || 72);
+
 // Acceso de emergencia. Antes era un usuario con la contraseña escrita en este
 // archivo, que vive en un repositorio. Ahora sale de variables de entorno y se
 // guarda hasheado; si no están definidas, simplemente no existe.
@@ -163,6 +170,7 @@ async function obtenerUsuario(email) {
                 // privilegios no existía por más que se guardara el campo.
                 rol: normalizarRoles(item.Item.rol?.S),
                 debe_cambiar_clave: item.Item.debe_cambiar_clave?.BOOL === true,
+                clave_temporal_expira: item.Item.clave_temporal_expira?.S || "",
                 desde_dynamo: true,
             };
         }
@@ -177,6 +185,7 @@ async function obtenerUsuario(email) {
             correo_reset: ADMIN_EMERGENCIA_CORREO,
             rol: ["rrhh", "auditoria"],
             debe_cambiar_clave: false,
+            clave_temporal_expira: "",
             desde_dynamo: false,
         };
     }
@@ -192,22 +201,51 @@ async function guardarClave(email, clave, { debeCambiar = false } = {}) {
         // password va con alias: DynamoDB rechaza la expresión si el nombre
         // del atributo cae en su lista de palabras reservadas, y no vale la
         // pena depender de que no esté.
-        UpdateExpression: "SET #password = :p, debe_cambiar_clave = :d, updated_at = :u",
+        // Al definir la contraseña propia se borra el vencimiento: deja de
+        // haber temporal que vigilar. Al poner una nueva temporal se
+        // escribe la fecha, para que caduque sola.
+        UpdateExpression: debeCambiar
+            ? "SET #password = :p, debe_cambiar_clave = :d, updated_at = :u, clave_temporal_expira = :e"
+            : "SET #password = :p, debe_cambiar_clave = :d, updated_at = :u REMOVE clave_temporal_expira",
         ExpressionAttributeNames: { "#password": "password" },
         ExpressionAttributeValues: {
             ":p": { S: hashear(clave) },
             ":d": { BOOL: debeCambiar },
             ":u": { S: new Date().toISOString() },
+            ...(debeCambiar ? { ":e": { S: vencimientoTemporal() } } : {}),
         },
     }));
+}
+
+/** Fecha ISO hasta la que sirve una contraseña temporal recién creada. */
+function vencimientoTemporal() {
+    return new Date(Date.now() + HORAS_CLAVE_TEMPORAL * 3600 * 1000).toISOString();
+}
+
+/** true si la temporal ya venció. Sin fecha guardada no vence: son los
+ *  usuarios creados antes de este cambio, y no se los deja afuera. */
+function temporalVencida(usuario) {
+    if (!usuario.debe_cambiar_clave || !usuario.clave_temporal_expira) return false;
+    return new Date(usuario.clave_temporal_expira).getTime() < Date.now();
 }
 
 /* ════════════════════════════════════════════════════════════
  * Correo
  * ════════════════════════════════════════════════════════════ */
 
+const smtpConfigurado = () =>
+    Boolean(process.env.SMTP_USUARIO && process.env.SMTP_CLAVE);
+
+/** Oculta el correo en las respuestas: confirma a dónde fue sin exponerlo. */
+function enmascararCorreo(correo) {
+    const [local, dominio] = String(correo).split("@");
+    if (!dominio) return "***";
+    const visible = local.slice(0, 2);
+    return `${visible}${"*".repeat(Math.max(local.length - 2, 1))}@${dominio}`;
+}
+
 async function enviarCorreo(destinatario, asunto, html) {
-    if (!process.env.SMTP_USUARIO || !process.env.SMTP_CLAVE) {
+    if (!smtpConfigurado()) {
         log("WARN", "SMTP sin configurar, no se envía correo", { destinatario });
         return;
     }
@@ -262,6 +300,13 @@ async function login(body) {
         return credencialesInvalidas();
     }
 
+    // La contraseña era correcta, así que decir que la temporal venció no
+    // revela nada que quien la escribió no sepa ya.
+    if (temporalVencida(usuario)) {
+        log("WARN", "Acceso con contraseña temporal vencida", { email });
+        return error(403, `La contraseña temporal venció. Pide que te envíen una nueva.`);
+    }
+
     if (migrar) {
         try {
             await guardarClave(email, clave, { debeCambiar: usuario.debe_cambiar_clave });
@@ -301,6 +346,10 @@ async function cambiarClavePropia(body) {
         log("WARN", "Cambio de contraseña con clave actual incorrecta", { email });
         return error(401, "La contraseña actual no es correcta");
     }
+    if (temporalVencida(usuario)) {
+        log("WARN", "Cambio con temporal vencida", { email });
+        return error(403, "La contraseña temporal venció. Pide que te envíen una nueva.");
+    }
     if (clave_actual === nueva_clave) {
         return error(400, "La contraseña nueva debe ser distinta de la actual");
     }
@@ -315,7 +364,12 @@ async function cambiarClavePropia(body) {
     await guardarClave(email, nueva_clave, { debeCambiar: false });
     log("INFO", "Contraseña cambiada por el usuario", { email });
 
-    return responder(200, { codigo: 0, descripcion: "Contraseña actualizada" });
+    // Se devuelve el rol para que el front entre sin pedir login otra vez.
+    return responder(200, {
+        codigo: 0,
+        descripcion: "Contraseña actualizada",
+        rol: usuario.rol,
+    });
 }
 
 async function crearUsuario(body) {
@@ -328,11 +382,14 @@ async function crearUsuario(body) {
         return error(400, "El usuario ya existe");
     }
 
-    const roles = normalizarRoles(Array.isArray(rol) ? rol.join(",") : rol);
+    // El correo es el único canal por el que viaja la temporal. Sin SMTP el
+    // usuario nacería inaccesible, así que se falla antes de crearlo.
+    if (!smtpConfigurado()) {
+        log("ERROR", "Intento de crear usuario sin SMTP configurado", { usuario });
+        return error(503, "El envío de correo no está configurado. Avisa al administrador del sistema.");
+    }
 
-    // La temporal se genera acá y se devuelve una sola vez para que quien
-    // administra la entregue en persona. No viaja por correo: un mensaje con
-    // la contraseña dentro queda en esa bandeja para siempre.
+    const roles = normalizarRoles(Array.isArray(rol) ? rol.join(",") : rol);
     const temporal = generarClaveTemporal();
 
     await dynamo.send(new PutItemCommand({
@@ -343,30 +400,107 @@ async function crearUsuario(body) {
             correo_reset: { S: correo },
             rol: { S: roles.join(",") },
             debe_cambiar_clave: { BOOL: true },
+            clave_temporal_expira: { S: vencimientoTemporal() },
             created_at: { S: new Date().toISOString() },
         },
     }));
 
+    // La temporal va por correo y no se devuelve a quien crea el usuario:
+    // quien administra no tiene por qué conocer una credencial ajena, ni
+    // siquiera de paso.
     try {
         await enviarCorreo(correo,
-            "Tu usuario de Biosecurity UCompensar fue creado",
-            plantilla(`
-                <p style="color:#333">Se creó tu usuario <strong>${usuario}</strong> en el sistema de control de acceso.</p>
-                <p style="color:#333">La contraseña temporal te la entrega directamente la persona que administra el sistema. Por seguridad no se envía por correo.</p>
-                <p style="color:#333">Al ingresar por primera vez el sistema te pedirá cambiarla.</p>
-                <p style="color:#888;font-size:13px">Si no esperabas este mensaje, avisa al área responsable.</p>`));
+            "Tu acceso a Biosecurity UCompensar",
+            correoClaveTemporal(usuario, temporal));
     } catch (e) {
-        log("WARN", "Error enviando correo de bienvenida", { error: e.message });
+        // Si el correo no sale, el usuario queda con una contraseña que
+        // nadie conoce. Se deshace la creación en vez de dejar ese registro.
+        log("ERROR", "No se pudo enviar la temporal, se revierte la creación", {
+            usuario, error: e.message,
+        });
+        try {
+            await dynamo.send(new DeleteItemCommand({
+                TableName: TABLA_USUARIOS,
+                Key: { email: { S: usuario } },
+            }));
+        } catch (e2) {
+            log("ERROR", "Falló revertir la creación del usuario", {
+                usuario, error: e2.message,
+            });
+        }
+        return error(502, "No se pudo enviar el correo. El usuario no fue creado; revisa la dirección e intenta de nuevo.");
     }
 
-    log("INFO", "Usuario creado", { usuario, rol: roles });
+    log("INFO", "Usuario creado", { usuario, rol: roles, horas: HORAS_CLAVE_TEMPORAL });
 
     return responder(200, {
         codigo: 0,
-        descripcion: `Usuario ${usuario} creado`,
-        clave_temporal: temporal,
+        descripcion: `Usuario ${usuario} creado. Se envió la contraseña temporal a ${enmascararCorreo(correo)}.`,
+        correo_enmascarado: enmascararCorreo(correo),
+        horas_vigencia: HORAS_CLAVE_TEMPORAL,
         rol: roles,
     });
+}
+
+/**
+ * Genera una temporal nueva para un usuario que ya existe y la envía por
+ * correo. Sirve cuando la anterior venció o el mensaje no llegó. La
+ * anterior deja de funcionar en el momento en que esta se guarda.
+ */
+async function reenviarTemporal(body) {
+    const { usuario } = body;
+    if (!usuario) return error(400, "Falta el usuario");
+
+    const registro = await obtenerUsuario(usuario);
+    if (!registro) return error(404, "El usuario no existe");
+    if (!registro.desde_dynamo) {
+        return error(400, "El usuario de emergencia se administra por configuración");
+    }
+    if (!registro.correo_reset) {
+        return error(400, "El usuario no tiene un correo registrado");
+    }
+    if (!smtpConfigurado()) {
+        return error(503, "El envío de correo no está configurado. Avisa al administrador del sistema.");
+    }
+
+    const temporal = generarClaveTemporal();
+    await guardarClave(usuario, temporal, { debeCambiar: true });
+
+    try {
+        await enviarCorreo(registro.correo_reset,
+            "Tu nueva contraseña temporal de Biosecurity UCompensar",
+            correoClaveTemporal(usuario, temporal, { reenvio: true }));
+    } catch (e) {
+        // Acá no se revierte: la contraseña anterior ya quedó invalidada y
+        // volver atrás sin conocerla es imposible. Se avisa para reintentar.
+        log("ERROR", "Falló el reenvío de la temporal", { usuario, error: e.message });
+        return error(502, "No se pudo enviar el correo. La contraseña anterior ya no sirve: vuelve a reenviarla.");
+    }
+
+    log("INFO", "Temporal reenviada", { usuario, horas: HORAS_CLAVE_TEMPORAL });
+
+    return responder(200, {
+        codigo: 0,
+        descripcion: `Se envió una contraseña temporal nueva a ${enmascararCorreo(registro.correo_reset)}.`,
+        correo_enmascarado: enmascararCorreo(registro.correo_reset),
+        horas_vigencia: HORAS_CLAVE_TEMPORAL,
+    });
+}
+
+/** Cuerpo del correo que lleva la contraseña temporal. */
+function correoClaveTemporal(usuario, temporal, { reenvio = false } = {}) {
+    const encabezado = reenvio
+        ? "Se generó una contraseña temporal nueva para tu usuario."
+        : `Se creó tu usuario <strong>${usuario}</strong> en el sistema de control de acceso.`;
+
+    return plantilla(`
+        <p style="color:#333">${encabezado}</p>
+        <p style="color:#333">Usuario: <strong>${usuario}</strong></p>
+        <p style="color:#333">Contraseña temporal:</p>
+        <p style="font-family:monospace;font-size:20px;letter-spacing:2px;background:#f4f4f4;padding:14px 18px;border-radius:8px;color:#111;display:inline-block">${temporal}</p>
+        <p style="color:#333">Sirve únicamente para entrar una vez y elegir tu propia contraseña: el sistema te la va a pedir antes de dejarte usar nada. Vence en ${HORAS_CLAVE_TEMPORAL} horas.</p>
+        ${reenvio ? '<p style="color:#333">La temporal anterior ya no funciona.</p>' : ""}
+        <p style="color:#888;font-size:13px">Nadie más recibió esta contraseña. Si no esperabas este mensaje, avisa al área responsable y no la uses.</p>`);
 }
 
 async function eliminarUsuario(body) {
@@ -556,6 +690,7 @@ function politica() {
 const ACCIONES = {
     login,
     crear_usuario: crearUsuario,
+    reenviar_temporal: reenviarTemporal,
     eliminar_usuario: eliminarUsuario,
     listar_usuarios: listarUsuarios,
     solicitar: solicitarCodigo,
