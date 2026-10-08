@@ -1,0 +1,11 @@
+# Copiar a terraform.tfvars y completar. Ese archivo no se versiona.
+#
+# El hash de la contraseña de emergencia se genera con:
+#   node scripts/generar-hash.js "LaContraseñaQueElijas"
+
+smtp_usuario = "biosecurityucompensar@gmail.com"
+smtp_clave   = "xxxx xxxx xxxx xxxx"
+
+admin_emergencia_usuario = "dfguatibonza"
+admin_emergencia_hash    = "scrypt$16384$8$1$...$..."
+admin_emergencia_correo  = "danielsuarez0796@gmail.com"

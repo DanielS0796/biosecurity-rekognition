@@ -4,6 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { API_RRHH_URL, API_RESET, API_KEY_RRHH } from '../config'
 import LivenessScan from '../components/LivenessScan'
+import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 
 export default function RRHH() {
   const [logueado, setLogueado] = useState(false)
@@ -12,6 +13,9 @@ export default function RRHH() {
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
+  // Quien entra con una contraseña temporal no pasa al sistema: primero
+  // la cambia. Se guarda la temporal para poder probar el cambio.
+  const [cambioPendiente, setCambioPendiente] = useState(null)
 
   const [identificacion, setIdentificacion] = useState('')
   const [nombre, setNombre] = useState('')
@@ -43,8 +47,10 @@ export default function RRHH() {
 
   const [nuevoUsuario, setNuevoUsuario] = useState('')
   const [nuevoCorreo, setNuevoCorreo] = useState('')
-  const [nuevoPass, setNuevoPass] = useState('')
-  const [nuevoPassConfirm, setNuevoPassConfirm] = useState('')
+  const [nuevoRoles, setNuevoRoles] = useState(['rrhh'])
+  // La contraseña temporal la genera el servidor y se muestra una sola vez,
+  // para entregarla en persona. No viaja por correo.
+  const [claveTemporal, setClaveTemporal] = useState(null)
   const [crearOk, setCrearOk] = useState('')
   const [crearErr, setCrearErr] = useState('')
   const [crearLoading, setCrearLoading] = useState(false)
@@ -82,9 +88,13 @@ export default function RRHH() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0 && body.rol.includes('rrhh')) {
+        if (body.debe_cambiar_clave) {
+          setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
+        } else {
         setLogueado(true)
         setUsuarioActual(loginUser)
         setTimeout(() => { cargarUsuarios() }, 500)
+        }
       } else {
         setLoginError('Usuario o contraseña incorrectos')
       }
@@ -213,22 +223,31 @@ export default function RRHH() {
   }
 
   async function crearUsuario() {
-    if (!nuevoUsuario || !nuevoCorreo || !nuevoPass) { alerta(setCrearErr, 'Complete todos los campos'); return }
-    if (nuevoPass !== nuevoPassConfirm) { alerta(setCrearErr, 'Las contraseñas no coinciden'); return }
-    if (nuevoPass.length < 6) { alerta(setCrearErr, 'La contraseña debe tener al menos 6 caracteres'); return }
+    if (!nuevoUsuario.trim() || !nuevoCorreo.trim()) {
+      alerta(setCrearErr, 'Complete el usuario y el correo'); return
+    }
+    if (!nuevoRoles.length) {
+      alerta(setCrearErr, 'Seleccione al menos un rol'); return
+    }
     setCrearLoading(true)
+    setClaveTemporal(null)
     try {
       const r = await fetch(API_RESET, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'crear_usuario', usuario: nuevoUsuario, correo: nuevoCorreo, clave: nuevoPass })
+        body: JSON.stringify({
+          accion: 'crear_usuario',
+          usuario: nuevoUsuario.trim(),
+          correo: nuevoCorreo.trim(),
+          rol: nuevoRoles.join(','),
+        })
       })
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
         playSound('success')
-        alerta(setCrearOk, `✅ ${body.descripcion}`)
-        setNuevoUsuario(''); setNuevoCorreo(''); setNuevoPass(''); setNuevoPassConfirm('')
+        setClaveTemporal({ usuario: nuevoUsuario.trim(), clave: body.clave_temporal })
+        setNuevoUsuario(''); setNuevoCorreo(''); setNuevoRoles(['rrhh'])
         cargarUsuarios()
       } else {
         playSound('error')
@@ -238,6 +257,11 @@ export default function RRHH() {
       alerta(setCrearErr, '⚠️ Error de conexión')
     }
     setCrearLoading(false)
+  }
+
+  function alternarRol(rol) {
+    setNuevoRoles(actual =>
+      actual.includes(rol) ? actual.filter(r => r !== rol) : [...actual, rol])
   }
 
   async function cargarUsuarios() {
@@ -344,6 +368,19 @@ export default function RRHH() {
       <div style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'rgba(240,90,34,0.35)', top: -80, left: -80 }} />
       <div style={{ position: 'absolute', width: 250, height: 250, borderRadius: '50%', background: 'rgba(0,180,216,0.25)', bottom: 100, right: -60 }} />
     </div>
+  )
+
+  if (cambioPendiente) return (
+    <CambioClaveObligatorio
+      usuario={cambioPendiente.usuario}
+      claveActual={cambioPendiente.clave}
+      onListo={() => {
+        setCambioPendiente(null)
+        setLoginPass('')
+        alert('Contraseña actualizada. Ingresa de nuevo con la contraseña que acabas de definir.')
+      }}
+      onCancelar={() => { setCambioPendiente(null); setLoginPass('') }}
+    />
   )
 
   if (!logueado) return (
@@ -616,11 +653,54 @@ export default function RRHH() {
             <div style={{ fontSize: 13, fontWeight: 700, color: '#1A2D5A', marginBottom: 10 }}>➕ Crear nuevo usuario</div>
             <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Usuario institucional</label><input style={inputStyle} type="text" placeholder="Ej: jperez" value={nuevoUsuario} onChange={e => setNuevoUsuario(e.target.value)} /></div>
             <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Correo electrónico</label><input style={inputStyle} type="email" placeholder="correo@ejemplo.com" value={nuevoCorreo} onChange={e => setNuevoCorreo(e.target.value)} /></div>
-            <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Contraseña</label><input style={inputStyle} type="password" placeholder="••••••••" value={nuevoPass} onChange={e => setNuevoPass(e.target.value)} /></div>
-            <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Confirmar contraseña</label><input style={inputStyle} type="password" placeholder="••••••••" value={nuevoPassConfirm} onChange={e => setNuevoPassConfirm(e.target.value)} /></div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Permisos</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['rrhh', 'Registro'], ['auditoria', 'Auditoría']].map(([valor, texto]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    onClick={() => alternarRol(valor)}
+                    style={{
+                      flex: 1, padding: '11px 12px', borderRadius: 10, cursor: 'pointer',
+                      fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700,
+                      border: nuevoRoles.includes(valor) ? '2px solid var(--blue)' : '2px solid #ddd',
+                      background: nuevoRoles.includes(valor) ? 'var(--blue)' : 'transparent',
+                      color: nuevoRoles.includes(valor) ? 'white' : '#777',
+                    }}>
+                    {nuevoRoles.includes(valor) ? '✓ ' : ''}{texto}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginBottom: 14, padding: 11, background: '#f0f4ff', borderRadius: 10, fontSize: 12, color: '#333', lineHeight: 1.5 }}>
+              El sistema genera una contraseña temporal y la muestra una sola vez al crear
+              el usuario. Entréguesela en persona: no se envía por correo, y al ingresar
+              se le pedirá cambiarla.
+            </div>
             {crearErr && <div style={{ ...alertErr, marginBottom: 10 }}>{crearErr}</div>}
             {crearOk && <div style={{ ...alertOk, marginBottom: 10 }}>{crearOk}</div>}
             <button style={btnPrimary} onClick={crearUsuario} disabled={crearLoading}>{crearLoading ? '⏳ Creando...' : 'Crear usuario'}</button>
+
+            {claveTemporal && (
+              <div style={{ marginTop: 14, padding: 16, background: '#fffaf0', borderRadius: 12, border: '2px solid #f0a020' }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#8a5a00', marginBottom: 8 }}>
+                  Usuario {claveTemporal.usuario} creado
+                </div>
+                <div style={{ fontSize: 12, color: '#6b4a10', marginBottom: 10, lineHeight: 1.5 }}>
+                  Esta es la contraseña temporal. Anótela ahora y entréguesela en persona:
+                  no se vuelve a mostrar ni se envía por correo.
+                </div>
+                <div style={{ padding: '12px 14px', background: '#fff', borderRadius: 8, border: '1px dashed #c08020', fontFamily: 'monospace', fontSize: 17, fontWeight: 700, letterSpacing: 1, textAlign: 'center', color: '#333', userSelect: 'all' }}>
+                  {claveTemporal.clave}
+                </div>
+                <button
+                  onClick={() => setClaveTemporal(null)}
+                  style={{ width: '100%', marginTop: 10, padding: 9, border: 'none', borderRadius: 8, background: '#8a5a00', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  Ya la anoté, ocultar
+                </button>
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1A2D5A' }}>👥 Usuarios registrados</div>

@@ -720,15 +720,46 @@ resource "aws_iam_role_policy" "lambda_reset_policy" {
 # ─────────────────────────────────────────
 # Lambda reset
 # ─────────────────────────────────────────
+# El zip antes se daba por existente y nunca se generaba, así que este Lambda
+# no se desplegaba desde Terraform.
+data "archive_file" "lambda_reset_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/lambda"
+  output_path = "${path.module}/lambda_build/reset.zip"
+  excludes    = ["registrar.zip", "function.zip", "auditoria.zip", "liveness.zip", "reset.zip"]
+}
+
 resource "aws_lambda_function" "reset" {
-  function_name = "biosecurity-reset"
-  filename      = "${path.module}/lambda_build/reset.zip"
-  handler       = "reset.handler"
-  runtime       = "nodejs22.x"
-  role          = aws_iam_role.lambda_role.arn
-  timeout       = 30
-  memory_size   = 256
-  tags          = { Project = "anlusoft-rekognition" }
+  function_name    = "biosecurity-reset"
+  filename         = data.archive_file.lambda_reset_zip.output_path
+  source_code_hash = data.archive_file.lambda_reset_zip.output_base64sha256
+  handler          = "reset.handler"
+  runtime          = "nodejs22.x"
+  role             = aws_iam_role.lambda_role.arn
+  timeout          = 30
+  memory_size      = 256
+
+  environment {
+    variables = {
+      TABLA_USUARIOS      = aws_dynamodb_table.usuarios.name
+      TABLA_CODIGOS       = aws_dynamodb_table.reset_codes.name
+      MODULE_NAME         = "reset"
+      MAX_INTENTOS_CODIGO = "5"
+
+      # Credenciales fuera del código: antes vivían escritas en reset.js, que
+      # está versionado. Los valores se pasan por terraform.tfvars, que no se
+      # versiona.
+      SMTP_USUARIO = var.smtp_usuario
+      SMTP_CLAVE   = var.smtp_clave
+
+      # Acceso de emergencia. Se guarda el hash, no la contraseña.
+      ADMIN_EMERGENCIA_USUARIO = var.admin_emergencia_usuario
+      ADMIN_EMERGENCIA_HASH    = var.admin_emergencia_hash
+      ADMIN_EMERGENCIA_CORREO  = var.admin_emergencia_correo
+    }
+  }
+
+  tags = { Project = "anlusoft-rekognition" }
 }
 
 # ─────────────────────────────────────────

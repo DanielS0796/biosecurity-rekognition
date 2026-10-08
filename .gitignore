@@ -13,3 +13,7 @@ lambda_build/
 *.zip
 *.bundle
 .next/
+
+# Credenciales locales de Terraform
+*.tfvars
+!*.tfvars.ejemplo

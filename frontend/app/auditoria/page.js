@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
+import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 
 export default function Auditoria() {
   const [logueado, setLogueado] = useState(false)
@@ -11,6 +12,9 @@ export default function Auditoria() {
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
+  // Quien entra con una contraseña temporal no pasa al sistema: primero
+  // la cambia. Se guarda la temporal para poder probar el cambio.
+  const [cambioPendiente, setCambioPendiente] = useState(null)
 
   const [datos, setDatos] = useState([])
   const [loading, setLoading] = useState(false)
@@ -40,9 +44,13 @@ export default function Auditoria() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0 && body.rol.includes('auditoria')) {
+        if (body.debe_cambiar_clave) {
+          setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
+        } else {
         setLogueado(true)
         setUsuarioActual(loginUser)
         cargarAuditoria()
+        }
       } else {
         setLoginError('Usuario o contraseña incorrectos')
       }
@@ -221,6 +229,19 @@ export default function Auditoria() {
       <div style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'rgba(240,90,34,0.35)', top: -80, left: -80 }} />
       <div style={{ position: 'absolute', width: 250, height: 250, borderRadius: '50%', background: 'rgba(0,180,216,0.25)', bottom: 100, right: -60 }} />
     </div>
+  )
+
+  if (cambioPendiente) return (
+    <CambioClaveObligatorio
+      usuario={cambioPendiente.usuario}
+      claveActual={cambioPendiente.clave}
+      onListo={() => {
+        setCambioPendiente(null)
+        setLoginPass('')
+        alert('Contraseña actualizada. Ingresa de nuevo con la contraseña que acabas de definir.')
+      }}
+      onCancelar={() => { setCambioPendiente(null); setLoginPass('') }}
+    />
   )
 
   if (!logueado) return (
