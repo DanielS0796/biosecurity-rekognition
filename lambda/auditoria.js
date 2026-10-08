@@ -2,7 +2,7 @@
 require("./instrument.js");
 const Sentry = require("@sentry/aws-serverless");
 
-const { DynamoDBClient, ScanCommand, GetItemCommand } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBClient, ScanCommand } = require("@aws-sdk/client-dynamodb");
 
 const dynamo = new DynamoDBClient({ region: "us-east-1" });
 
@@ -138,26 +138,45 @@ function agrupar(items) {
     return Object.values(registros);
 }
 
-async function completarNombres(registros) {
-    const pendientes = [...new Set(
-        registros
-            .filter(r => !r.nombre || r.nombre === r.identificacion)
-            .map(r => r.identificacion)
-    )];
+/**
+ * Completa nombre y vínculo institucional desde el padrón de personas.
+ *
+ * Antes se hacía un GetItem por cada registro sin nombre, y solo contra
+ * empleados. Ahora se recorren las dos tablas una vez: hacen falta todos
+ * los vínculos, no solo los de quienes llegaron sin nombre, y de paso
+ * quien ya se retiró deja de aparecer en el reporte con la cédula en vez
+ * del nombre. Son dos tablas pequeñas, un Scan cada una.
+ */
+async function completarDatosPersonales(registros) {
+    const padron = {};
 
-    const nombres = {};
-    for (const id of pendientes) {
+    for (const tabla of ["biosecurity-empleados", "biosecurity-retirados"]) {
         try {
-            const emp = await dynamo.send(new GetItemCommand({
-                TableName: "biosecurity-empleados",
-                Key: { identificacion: { S: id } },
+            const r = await dynamo.send(new ScanCommand({
+                TableName: tabla,
+                ProjectionExpression: "identificacion, nombre, tipo_persona",
             }));
-            if (emp.Item?.nombre?.S) nombres[id] = emp.Item.nombre.S;
-        } catch { /* el registro queda con la cédula como nombre */ }
+            for (const i of r.Items || []) {
+                const id = i.identificacion?.S;
+                if (!id) continue;
+                // Los activos mandan sobre los retirados si por alguna
+                // razón alguien estuviera en las dos.
+                if (padron[id] && tabla.endsWith("retirados")) continue;
+                padron[id] = {
+                    nombre: i.nombre?.S || "",
+                    tipo: i.tipo_persona?.S || "",
+                };
+            }
+        } catch (e) {
+            log("WARN", "No se pudo leer el padrón", { tabla, error: e.message });
+        }
     }
 
     for (const r of registros) {
-        if (nombres[r.identificacion]) r.nombre = nombres[r.identificacion];
+        const p = padron[r.identificacion];
+        if (!p) continue;
+        if (p.nombre && (!r.nombre || r.nombre === r.identificacion)) r.nombre = p.nombre;
+        r.tipo_persona = p.tipo;
     }
 }
 
@@ -165,6 +184,9 @@ function aFilas(registros) {
     return registros.map(r => ({
         identificacion: r.identificacion,
         nombre: r.nombre,
+        // Vacío en quienes se registraron antes de que existiera la
+        // categoría; no se les supone una.
+        tipo_persona: r.tipo_persona || "",
         fecha: r.fecha,
         hora_entrada: horaLocal(r.hora_entrada),
         hora_salida: horaLocal(r.hora_salida),
@@ -192,7 +214,7 @@ exports.handler = Sentry.wrapHandler(async (event) => {
         if (desde) registros = registros.filter(r => r.fecha >= desde);
         if (hasta) registros = registros.filter(r => r.fecha <= hasta);
 
-        await completarNombres(registros);
+        await completarDatosPersonales(registros);
 
         registros.sort((a, b) => {
             const fa = a.hora_entrada || `${a.fecha}T00:00:00`;
@@ -220,11 +242,11 @@ exports.handler = Sentry.wrapHandler(async (event) => {
         // CSV con punto y coma: es el separador que espera Excel en
         // configuración regional de español, y con coma mete la fila
         // completa en una sola columna.
-        const encabezados = ["Identificacion", "Nombre", "Fecha", "Hora Entrada", "Hora Salida", "Metodo"];
+        const encabezados = ["Identificacion", "Nombre", "Vinculo", "Fecha", "Hora Entrada", "Hora Salida", "Metodo"];
         const lineas = [
             encabezados,
             ...filas.map(f => [
-                f.identificacion, f.nombre, f.fecha,
+                f.identificacion, f.nombre, f.tipo_persona, f.fecha,
                 f.hora_entrada, f.hora_salida || "Sin salida", f.metodo,
             ]),
         ].map(fila => fila.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));

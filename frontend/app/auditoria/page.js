@@ -5,6 +5,17 @@ import Link from 'next/link'
 import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 
+// Mismo vocabulario que el módulo de registro. El valor guardado va en
+// minúscula; acá se presenta.
+const ETIQUETA_VINCULO = {
+  estudiante: 'Estudiante',
+  docente: 'Docente',
+  funcionario: 'Funcionario',
+  contratista: 'Contratista',
+}
+
+const vinculoLegible = (v) => ETIQUETA_VINCULO[v] || v || ''
+
 export default function Auditoria() {
   const [logueado, setLogueado] = useState(false)
   const [usuarioActual, setUsuarioActual] = useState('')
@@ -111,6 +122,7 @@ export default function Auditoria() {
       hoja.columns = [
         { header: 'Identificación', key: 'identificacion', width: 18 },
         { header: 'Nombre', key: 'nombre', width: 32 },
+        { header: 'Vínculo', key: 'vinculo', width: 16 },
         { header: 'Fecha', key: 'fecha', width: 14 },
         { header: 'Hora entrada', key: 'entrada', width: 14 },
         { header: 'Hora salida', key: 'salida', width: 14 },
@@ -128,6 +140,7 @@ export default function Auditoria() {
         const fila = hoja.addRow({
           identificacion: i.identificacion || '',
           nombre: i.nombre || '',
+          vinculo: vinculoLegible(i.tipo_persona),
           fecha: i.fecha || '',
           entrada: i.hora_entrada || '',
           salida: i.hora_salida || 'Sin salida',
@@ -402,7 +415,7 @@ export default function Auditoria() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Identificación', 'Nombre', 'Fecha', 'Entrada', 'Salida'].map((h, i, arr) => (
+                        {['Identificación', 'Nombre', 'Vínculo', 'Fecha', 'Entrada', 'Salida'].map((h, i, arr) => (
                           <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
                         ))}
                       </tr>
@@ -412,6 +425,7 @@ export default function Auditoria() {
                         <tr key={i}>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontWeight: 700 }}>{item.identificacion || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>{item.nombre || '-'}</td>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#666' }}>{vinculoLegible(item.tipo_persona) || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{item.fecha || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#2e7d32', fontWeight: 600 }}>{item.hora_entrada || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: item.hora_salida ? '#c62828' : '#888', fontWeight: item.hora_salida ? 600 : 400 }}>

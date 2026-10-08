@@ -23,7 +23,7 @@ const pedir = async (q) => {
   return { status: r.statusCode, body: r.body, json: (() => { try { return JSON.parse(r.body); } catch { return null; } })() };
 };
 
-const reset = () => { dyn.__estado.accesos = []; dyn.__estado.empleados = {}; dyn.__estado.scans = []; };
+const reset = () => { dyn.__estado.accesos = []; dyn.__estado.empleados = {}; dyn.__estado.retirados = {}; dyn.__estado.scans = []; };
 
 (async () => {
 
@@ -143,6 +143,37 @@ dyn.__estado.accesos = [acceso('100', 'Ana', '2026-10-06T14:00:00Z', 'ENTRADA')]
 r = await pedir({ format: 'json', desde: 'no-es-fecha', hasta: '31/12/2026' });
 check('responde igual', r.status === 200, `-> ${r.status}`);
 check('sin aplicar el filtro corrupto', r.json.items.length === 1, `-> ${r.json.items.length}`);
+
+console.log('\n── El vínculo institucional sale en el reporte ──');
+reset();
+dyn.__estado.accesos = [
+  acceso('200', '200', '2026-10-06T14:00:00Z', 'ENTRADA'),
+  acceso('201', '201', '2026-10-06T15:00:00Z', 'ENTRADA'),
+  acceso('202', '202', '2026-10-06T16:00:00Z', 'ENTRADA'),
+];
+dyn.__estado.empleados = {
+  '200': { nombre: 'Luz Mena', tipo: 'docente' },
+  '202': { nombre: 'Sin categoria', tipo: '' },
+};
+// Quien ya se retiró sigue apareciendo en el histórico de accesos.
+dyn.__estado.retirados = { '201': { nombre: 'Iván Peña', tipo: 'contratista' } };
+
+r = await pedir({ format: 'json' });
+const porId = Object.fromEntries(r.json.items.map(i => [i.identificacion, i]));
+check('el activo trae su vínculo', porId['200']?.tipo_persona === 'docente',
+  JSON.stringify(porId['200']));
+check('el retirado también', porId['201']?.tipo_persona === 'contratista',
+  JSON.stringify(porId['201']));
+check('y su nombre, que antes se perdía', porId['201']?.nombre === 'Iván Peña',
+  porId['201']?.nombre);
+check('sin categoría queda vacío, no inventado', porId['202']?.tipo_persona === '',
+  JSON.stringify(porId['202']?.tipo_persona));
+
+const csv = (await pedir({ format: 'csv' })).body;
+check('el CSV lleva la columna', /"Identificacion";"Nombre";"Vinculo";"Fecha"/.test(csv),
+  csv.split('\n')[0]);
+check('con el valor en su sitio', /"Luz Mena";"docente"/.test(csv),
+  csv.split('\n').find(l => l.includes('Luz Mena')));
 
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
