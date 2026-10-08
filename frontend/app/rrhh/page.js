@@ -48,8 +48,8 @@ export default function RRHH() {
   const [nuevoUsuario, setNuevoUsuario] = useState('')
   const [nuevoCorreo, setNuevoCorreo] = useState('')
   const [nuevoRoles, setNuevoRoles] = useState(['rrhh'])
-  // La contraseña temporal la genera el servidor y se muestra una sola vez,
-  // para entregarla en persona. No viaja por correo.
+  // La temporal la genera el servidor y viaja solo por correo al usuario.
+  // Acá no se guarda la contraseña, únicamente la confirmación del envío.
   const [avisoEnvio, setAvisoEnvio] = useState(null)
   const [reenviando, setReenviando] = useState(null)
   const [crearOk, setCrearOk] = useState('')
@@ -721,9 +721,9 @@ export default function RRHH() {
               </div>
             </div>
             <div style={{ marginBottom: 14, padding: 11, background: '#f0f4ff', borderRadius: 10, fontSize: 12, color: '#333', lineHeight: 1.5 }}>
-              El sistema genera una contraseña temporal y la muestra una sola vez al crear
-              el usuario. Entréguesela en persona: no se envía por correo, y al ingresar
-              se le pedirá cambiarla.
+              El sistema genera una contraseña temporal y se la envía al correo que
+              registres acá. Tú no la ves: vence en 72 horas y solo le sirve a esa
+              persona para elegir la suya al ingresar.
             </div>
             {crearErr && <div style={{ ...alertErr, marginBottom: 10 }}>{crearErr}</div>}
             {crearOk && <div style={{ ...alertOk, marginBottom: 10 }}>{crearOk}</div>}
