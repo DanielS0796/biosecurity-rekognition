@@ -7,6 +7,18 @@ import LivenessScan from '../components/LivenessScan'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 import ConsentimientoDatos from '../components/ConsentimientoDatos'
 
+// Vínculo de la persona con la institución. Es una universidad: quien
+// entra puede no ser empleado de nadie. El orden es por frecuencia
+// esperada, no alfabético.
+const TIPOS_PERSONA = [
+  ['estudiante', 'Estudiante'],
+  ['docente', 'Docente'],
+  ['funcionario', 'Funcionario'],
+  ['contratista', 'Contratista'],
+]
+
+const ETIQUETA_TIPO = Object.fromEntries(TIPOS_PERSONA)
+
 export default function RRHH() {
   const [logueado, setLogueado] = useState(false)
   const [usuarioActual, setUsuarioActual] = useState('')
@@ -52,6 +64,7 @@ export default function RRHH() {
   // La temporal la genera el servidor y viaja solo por correo al usuario.
   // Acá no se guarda la contraseña, únicamente la confirmación del envío.
   const [correoEmpleado, setCorreoEmpleado] = useState('')
+  const [tipoPersona, setTipoPersona] = useState('estudiante')
   // Autorización de la persona que se va a registrar. Se guarda acá
   // entre que la da y el escaneo termina; no se persiste en el
   // navegador, la constancia que vale es la del servidor.
@@ -182,6 +195,7 @@ export default function RRHH() {
     setIdentificacion('')
     setNombre('')
     setCorreoEmpleado('')
+    setTipoPersona('estudiante')
     setAutorizacion(null)
     setSinDestellos(false)
     setResultadoRegistro(null)
@@ -201,7 +215,7 @@ export default function RRHH() {
       if (body.codigo === 0 && body.nombre) {
         setEmpleadoEncontrado(body)
       } else {
-        alerta(setElimErr, 'No se encontró ningún empleado con esa identificación')
+        alerta(setElimErr, 'No se encontró a nadie con esa identificación')
       }
     } catch {
       alerta(setElimErr, '⚠️ Error de conexión')
@@ -573,17 +587,17 @@ export default function RRHH() {
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)' }}>Registrar Empleado</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)' }}>Registrar Persona</div>
                 <div style={{ fontSize: 13, color: '#666' }}>Verificación de persona viva</div>
               </div>
               <button onClick={logout} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer' }}>Cerrar sesión</button>
             </div>
 
-            {/* PASO 1 — datos del empleado */}
+            {/* PASO 1 — datos de la persona */}
             {pasoRegistro === 'datos' && (
               <>
                 <div style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 12, borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.5 }}>
-                  El empleado hará un escaneo en vivo: deberá centrar el rostro en el
+                  La persona hará un escaneo en vivo: deberá centrar el rostro en el
                   óvalo{sinDestellos ? '' : ' mientras la pantalla emite destellos de color'}.
                   Una fotografía impresa o en otra pantalla no supera esta prueba.
                 </div>
@@ -594,6 +608,25 @@ export default function RRHH() {
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nombre completo</label>
                   <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Vínculo con la institución</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {TIPOS_PERSONA.map(([clave, texto]) => (
+                      <button
+                        key={clave}
+                        onClick={() => setTipoPersona(clave)}
+                        style={{
+                          flex: '1 1 auto', minWidth: 104, padding: '11px 10px', borderRadius: 12,
+                          border: tipoPersona === clave ? '2px solid var(--blue)' : '2px solid #e2e2e2',
+                          background: tipoPersona === clave ? 'var(--blue)' : 'transparent',
+                          color: tipoPersona === clave ? '#fff' : '#777',
+                          fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        }}>
+                        {texto}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Correo de la persona</label>
@@ -644,6 +677,7 @@ export default function RRHH() {
                   identificacion={identificacion.trim()}
                   nombre={nombre.trim()}
                   correo={correoEmpleado.trim()}
+                  tipoPersona={tipoPersona}
                   autorizacion={autorizacion}
                   sinDestellos={sinDestellos}
                   onExito={registroExitoso}
@@ -658,7 +692,7 @@ export default function RRHH() {
               <>
                 <div style={{ marginBottom: 14, padding: 16, background: '#e8f5e9', borderRadius: 12, border: '2px solid #2e7d32' }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: '#2e7d32', marginBottom: 8 }}>
-                    Empleado registrado
+                    Persona registrada
                   </div>
                   <div style={{ fontSize: 13, color: '#1b5e20', marginBottom: 3 }}>
                     {resultadoRegistro.nombre} · CC {resultadoRegistro.identificacion}
@@ -667,7 +701,7 @@ export default function RRHH() {
                     Confianza del escaneo: <strong>{resultadoRegistro.confianza_liveness}%</strong>
                   </div>
                 </div>
-                <button style={btnPrimary} onClick={nuevoRegistro}>Registrar otro empleado</button>
+                <button style={btnPrimary} onClick={nuevoRegistro}>Registrar otra persona</button>
               </>
             )}
 
@@ -677,8 +711,8 @@ export default function RRHH() {
 
           {/* ELIMINAR */}
           <div style={{ ...cardStyle, border: '2px solid #fee2e2' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#c62828', marginBottom: 6 }}>🗑️ Eliminar Empleado</div>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>Busque al empleado antes de eliminar</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#c62828', marginBottom: 6 }}>🗑️ Eliminar Persona</div>
+            <div style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>Busque a la persona antes de eliminar</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 14 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación</label>
@@ -689,11 +723,11 @@ export default function RRHH() {
             {buscarLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13 }}>⏳ Buscando...</div>}
             {empleadoEncontrado && (
               <div style={{ marginTop: 10, padding: 16, background: '#fff3e0', borderRadius: 12, border: '2px solid #FF9800' }}>
-                <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>Empleado encontrado:</div>
+                <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>Persona encontrada:</div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--blue)' }}>{empleadoEncontrado.nombre}</div>
                 <div style={{ fontSize: 13, color: '#666', marginTop: 2 }}>CC: {eliminarId}</div>
                 <div style={{ marginTop: 14, padding: 10, background: '#fdecea', borderRadius: 8, fontSize: 13, color: '#c62828', fontWeight: 600 }}>
-                  ⚠️ Esta acción eliminará al empleado y no se puede deshacer
+                  ⚠️ Esta acción eliminará a la persona y no se puede deshacer
                 </div>
                 <button onClick={confirmarEliminar} style={{ width: '100%', marginTop: 12, padding: 13, border: 'none', borderRadius: 12, background: '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>✅ Confirmar Eliminación</button>
                 <button onClick={() => { setEmpleadoEncontrado(null); setEliminarId('') }} style={{ width: '100%', marginTop: 8, padding: 11, border: '2px solid #888', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
@@ -708,20 +742,26 @@ export default function RRHH() {
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#2e7d32' }}>👥 Trabajadores Activos</div>
-                <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{activos.length > 0 ? `${activos.length} empleado${activos.length !== 1 ? 's' : ''}` : '—'}</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#2e7d32' }}>👥 Personas Activas</div>
+                <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{activos.length > 0 ? `${activos.length} persona${activos.length !== 1 ? 's' : ''}` : '—'}</div>
               </div>
               <button onClick={toggleActivos} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 20, cursor: 'pointer' }}>
                 {activosLoading ? '⏳' : mostrarActivos ? 'Ocultar' : 'Ver todos'}
               </button>
             </div>
             {mostrarActivos && (activos.length === 0
-              ? <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: 14 }}>No hay empleados activos</div>
+              ? <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: 14 }}>No hay personas activas</div>
               : activos.map(e => (
                 <div key={e.identificacion} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div>
                     <div style={{ fontWeight: 800, color: 'var(--blue)', fontSize: 14 }}>{e.nombre}</div>
-                    <div style={{ fontSize: 12, color: '#888' }}>CC: {e.identificacion}</div>
+                    <div style={{ fontSize: 12, color: '#888' }}>
+                      CC: {e.identificacion}
+                      {/* Vacío en quienes se registraron antes de que
+                          existiera la categoría. Se omite en vez de
+                          suponerles una. */}
+                      {e.tipo_persona && <> · {ETIQUETA_TIPO[e.tipo_persona] || e.tipo_persona}</>}
+                    </div>
                   </div>
                   <div style={{ width: 10, height: 10, background: '#2e7d32', borderRadius: '50%' }} />
                 </div>
@@ -733,7 +773,7 @@ export default function RRHH() {
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#c62828' }}>🚪 Trabajadores Retirados</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#c62828' }}>🚪 Personas Retiradas</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{retirados.length > 0 ? `${retirados.length} retirado${retirados.length !== 1 ? 's' : ''}` : '—'}</div>
               </div>
               <button onClick={toggleRetirados} style={{ background: '#c62828', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 20, cursor: 'pointer' }}>
@@ -741,12 +781,15 @@ export default function RRHH() {
               </button>
             </div>
             {mostrarRetirados && (retirados.length === 0
-              ? <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: 14 }}>No hay empleados retirados</div>
+              ? <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: 14 }}>No hay personas retiradas</div>
               : retirados.map(e => (
                 <div key={e.identificacion} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div>
                     <div style={{ fontWeight: 800, color: '#c62828', fontSize: 14 }}>{e.nombre}</div>
-                    <div style={{ fontSize: 12, color: '#888' }}>CC: {e.identificacion}</div>
+                    <div style={{ fontSize: 12, color: '#888' }}>
+                      CC: {e.identificacion}
+                      {e.tipo_persona && <> · {ETIQUETA_TIPO[e.tipo_persona] || e.tipo_persona}</>}
+                    </div>
                   </div>
                   <div style={{ width: 10, height: 10, background: '#c62828', borderRadius: '50%' }} />
                 </div>

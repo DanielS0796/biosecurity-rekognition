@@ -257,6 +257,38 @@ check('dice a dónde revocar', /biosecurityucompensar@gmail\.com/.test(texto));
 check('explica que no se guarda la foto', /no la\s+fotograf/i.test(texto), texto.slice(0, 200));
 check('menciona la ley', /Ley 1581/.test(texto));
 
+console.log('\n── Vínculo con la institución ──');
+reset();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-tipo' };
+await post('/liveness-init', {
+  proposito: 'registro', identificacion: '900', nombre: 'Luz Mena',
+  tipo_persona: 'docente', ...AUTORIZA });
+check('la sesión guarda el tipo',
+  dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-tipo']?.tipo_persona?.S === 'docente');
+
+rek.__estado.respuestas.GetFaceLivenessSessionResultsCommand = {
+  Status: 'SUCCEEDED', Confidence: 95, ReferenceImage: { Bytes: Buffer.from('cara') } };
+rek.__estado.respuestas.IndexFacesCommand = { FaceRecords: [{ Face: { FaceId: 'f-900' } }] };
+await post('/liveness-result', { session_id: 's-tipo' });
+check('y la persona queda con él',
+  dyn.__estado.tablas['biosecurity-empleados']?.['900']?.tipo_persona?.S === 'docente',
+  JSON.stringify(dyn.__estado.tablas['biosecurity-empleados']?.['900']?.tipo_persona));
+
+reset();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-raro' };
+await post('/liveness-init', {
+  proposito: 'registro', identificacion: '901', nombre: 'Otro',
+  tipo_persona: 'rector-supremo', ...AUTORIZA });
+check('un tipo inventado cae en estudiante',
+  dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-raro']?.tipo_persona?.S === 'estudiante');
+
+reset();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-vacio' };
+await post('/liveness-init', {
+  proposito: 'registro', identificacion: '902', nombre: 'Otra', ...AUTORIZA });
+check('sin tipo también cae en estudiante',
+  dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-vacio']?.tipo_persona?.S === 'estudiante');
+
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();

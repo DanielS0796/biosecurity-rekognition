@@ -40,6 +40,7 @@ import {
  *   identificacion cédula (obligatoria para registro)
  *   nombre         nombre del empleado (obligatorio para registro)
  *   correo         a dónde se envía la constancia (obligatorio para registro)
+ *   tipoPersona    estudiante | docente | funcionario | contratista
  *   autorizacion   { autorizado, politica_version, canal } (obligatoria para registro)
  *   sinDestellos   omite la secuencia de luces (vía para fotosensibles)
  *   onExito        (datos) => void   resultado del backend
@@ -138,6 +139,7 @@ export default function LivenessScan({
   identificacion = '',
   nombre = '',
   correo = '',
+  tipoPersona = 'estudiante',
   // Constancia de la autorización que la persona dio antes de llegar
   // acá. El servidor la verifica y la guarda; el navegador solo la
   // transporta.
@@ -198,6 +200,7 @@ export default function LivenessScan({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             proposito, identificacion, nombre, correo,
+            tipo_persona: tipoPersona,
             autorizacion, sin_destellos: sinDestellos,
           }),
         })
@@ -220,7 +223,7 @@ export default function LivenessScan({
     // render y el efecto se reiniciaría sin fin, abriendo una sesión de
     // Rekognition cada vez.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proposito, identificacion, nombre, correo, sinDestellos,
+  }, [proposito, identificacion, nombre, correo, tipoPersona, sinDestellos,
       autorizacion?.autorizado, autorizacion?.politica_version])
 
   // Rekognition terminó de analizar el video. Le pedimos el veredicto al

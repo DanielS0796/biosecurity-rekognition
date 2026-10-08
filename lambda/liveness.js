@@ -60,6 +60,17 @@ const POLITICA_VERSION = process.env.POLITICA_VERSION || "2026-10-v1";
 // Buzón al que la persona escribe para consultar, actualizar o revocar.
 const CANAL_HABEAS_DATA = process.env.CANAL_HABEAS_DATA || "biosecurityucompensar@gmail.com";
 
+// Vínculo de la persona con la institución. Es una universidad, no una
+// empresa: quien entra puede no ser empleado de nadie.
+const TIPOS_PERSONA = ["estudiante", "docente", "funcionario", "contratista"];
+const TIPO_POR_DEFECTO = "estudiante";
+
+/** Normaliza el tipo recibido. Uno inventado cae en el de por defecto. */
+function normalizarTipo(valor) {
+    const t = String(valor || "").trim().toLowerCase();
+    return TIPOS_PERSONA.includes(t) ? t : TIPO_POR_DEFECTO;
+}
+
 // Confianza mínima de liveness (0-100). Es el score que dice si había una
 // persona real frente a la cámara. 85 es el punto de equilibrio que recomienda
 // AWS; subirlo endurece el control a costa de más reintentos legítimos.
@@ -126,6 +137,7 @@ async function iniciarLiveness(event) {
     const sinDestellos = body.sin_destellos === true;
 
     const correo = (body.correo || "").trim();
+    const tipoPersona = normalizarTipo(body.tipo_persona);
     const autorizacion = body.autorizacion || {};
 
     if (proposito === "registro") {
@@ -200,6 +212,7 @@ async function iniciarLiveness(event) {
             // Constancia de la autorización. La fecha la pone el
             // servidor: una que mande el navegador no prueba nada.
             correo: { S: correo || "-" },
+            tipo_persona: { S: tipoPersona },
             autorizacion_datos: { BOOL: proposito === "registro" },
             autorizacion_fecha: { S: new Date().toISOString() },
             politica_version: { S: proposito === "registro" ? POLITICA_VERSION : "-" },
@@ -265,6 +278,7 @@ async function procesarResultado(event) {
     // La constancia se fijó al crear la sesión, con la hora del servidor.
     const evidencia = {
         correo: sesion.Item.correo?.S || "",
+        tipoPersona: sesion.Item.tipo_persona?.S || "estudiante",
         autorizacionFecha: sesion.Item.autorizacion_fecha?.S || "",
         politicaVersion: sesion.Item.politica_version?.S || "",
         autorizacionCanal: sesion.Item.autorizacion_canal?.S || "app-web",
@@ -372,7 +386,7 @@ async function procesarResultado(event) {
  * ──────────────────────────────────────────────────────────── */
 async function registrarEmpleado({
     sessionId, identificacion, nombre, imagen, confianza,
-    correo, autorizacionFecha, politicaVersion, autorizacionCanal,
+    correo, tipoPersona, autorizacionFecha, politicaVersion, autorizacionCanal,
 }) {
     // Revalida la cédula: pudo registrarse alguien más mientras duraba el escaneo.
     const existente = await dynamo.send(new GetItemCommand({
@@ -467,6 +481,7 @@ async function registrarEmpleado({
             // registro del empleado se baste a sí mismo: quien audite no
             // tiene que cruzar dos tablas para saber si hubo permiso.
             correo: { S: correo },
+            tipo_persona: { S: tipoPersona },
             autorizacion_datos: { BOOL: true },
             autorizacion_fecha: { S: autorizacionFecha },
             politica_version: { S: politicaVersion },

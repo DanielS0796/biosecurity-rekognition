@@ -68,6 +68,7 @@ exports.handler = Sentry.wrapHandler(async (event) => {
                 const items = (result.Items || []).map(i => ({
                     identificacion: i.identificacion?.S,
                     nombre: i.nombre?.S,
+                    tipo_persona: i.tipo_persona?.S || "",
                     fecha_registro: i.fecha_registro?.S,
                     fecha_retiro: i.fecha_retiro?.S
                 })).sort((a, b) => (b.fecha_retiro || "").localeCompare(a.fecha_retiro || ""));
@@ -84,6 +85,9 @@ exports.handler = Sentry.wrapHandler(async (event) => {
             const items = (result.Items || []).map(i => ({
                 identificacion: i.identificacion?.S,
                 nombre: i.nombre?.S,
+                // Vacío en los registros anteriores al cambio: no se les
+                // inventa una categoría que nadie eligió.
+                tipo_persona: i.tipo_persona?.S || "",
                 fecha_registro: i.fecha_registro?.S
             })).sort((a, b) => (b.fecha_registro || "").localeCompare(a.fecha_registro || ""));
             return { statusCode: 200, headers: CORS, body: JSON.stringify({ codigo: 0, items }) };
