@@ -17,6 +17,10 @@ import { useState } from 'react'
  * negarse tiene que ser al menos tan fácil como aceptar, o el
  * consentimiento no es libre.
  *
+ * Ocupa la pantalla entera a propósito. Una autorización que se lee en
+ * una ventanita de 12 píxeles se firma sin leer, y una autorización que
+ * nadie leyó es mala prueba el día que alguien reclame.
+ *
  * La versión viaja al servidor y queda guardada con la autorización. Si
  * se cambia el texto de abajo hay que subir POLITICA_VERSION acá y en
  * liveness-api.tf, o las constancias dirán que la gente aceptó algo que
@@ -29,8 +33,8 @@ export const CANAL_HABEAS_DATA = 'biosecurityucompensar@gmail.com'
 const PUNTOS = [
   {
     titulo: 'Qué se guarda',
-    texto: 'Un vector matemático derivado de tu rostro, no la fotografía. ' +
-      'Ese vector es un conjunto de números del que no se puede reconstruir tu cara.',
+    texto: 'Un vector matemático derivado de tu rostro, no la fotografía. Ese vector ' +
+      'es un conjunto de números del que no se puede reconstruir tu cara.',
   },
   {
     titulo: 'Para qué',
@@ -39,8 +43,9 @@ const PUNTOS = [
   },
   {
     titulo: 'Quién lo trata',
-    texto: 'Fundación Universitaria Compensar, como responsable. El procesamiento ' +
-      'técnico ocurre en Amazon Web Services, en servidores de Estados Unidos.',
+    texto: 'Fundación Universitaria Compensar, como responsable del tratamiento. ' +
+      'El procesamiento técnico ocurre en Amazon Web Services, en servidores ' +
+      'ubicados en Estados Unidos.',
   },
   {
     titulo: 'Por cuánto tiempo',
@@ -69,24 +74,41 @@ export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
 
   return (
     <div style={e.fondo}>
-      <div style={e.tarjeta}>
-        <div style={e.encabezado}>
-          <div style={e.titulo}>Autorización de datos biométricos</div>
-          <div style={e.ley}>Ley 1581 de 2012 · Decreto 1377 de 2013</div>
-        </div>
+      <div style={e.hoja}>
+        <div style={e.columna}>
 
-        <div style={e.cuerpo}>
-          <p style={e.intro}>
-            {nombre ? <><strong>{nombre}</strong>, antes</> : 'Antes'} de escanear el rostro
-            necesitamos tu permiso. Lee esto con calma; no hay prisa.
-          </p>
+          <header style={e.encabezado}>
+            <h1 style={e.titulo}>Autorización de datos biométricos</h1>
+            <p style={e.entrada}>
+              {nombre ? <><strong style={e.nombre}>{nombre}</strong>, antes</> : 'Antes'} de
+              escanear tu rostro necesitamos tu permiso. Lee esto con calma; no hay prisa
+              y puedes decir que no.
+            </p>
+          </header>
 
-          {PUNTOS.map((p, i) => (
-            <div key={i} style={e.punto}>
-              <div style={e.puntoTitulo}>{p.titulo}</div>
-              <div style={e.puntoTexto}>{p.texto}</div>
-            </div>
-          ))}
+          <div style={e.puntos}>
+            {PUNTOS.map((p, i) => (
+              <section key={i} style={e.punto}>
+                <h2 style={e.puntoTitulo}>{p.titulo}</h2>
+                <p style={e.puntoTexto}>{p.texto}</p>
+              </section>
+            ))}
+          </div>
+
+          <div style={e.marco}>
+            <p style={e.marcoTexto}>
+              Esta autorización se otorga conforme a la <strong>Ley Estatutaria 1581
+              de 2012</strong>, por la cual se dictan disposiciones generales para la
+              protección de datos personales en Colombia, y a su decreto
+              reglamentario, el <strong>Decreto 1377 de 2013</strong>.
+            </p>
+            <p style={e.marcoTexto}>
+              El artículo 5 clasifica los datos biométricos como datos sensibles. El
+              artículo 9 exige que su tratamiento cuente con autorización previa e
+              informada del titular. El artículo 8 reconoce tu derecho a conocer,
+              actualizar, rectificar y revocar lo que autorices, en cualquier momento.
+            </p>
+          </div>
 
           <label style={e.casillaFila}>
             <input
@@ -101,12 +123,14 @@ export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
               para el control de acceso.
             </span>
           </label>
-        </div>
 
-        <div style={e.pie}>
-          <button
-            onClick={onRechaza}
-            style={e.botonRechazo}>
+          <p style={e.version}>Política versión {POLITICA_VERSION}</p>
+        </div>
+      </div>
+
+      <div style={e.pie}>
+        <div style={e.pieColumna}>
+          <button onClick={onRechaza} style={e.botonRechazo}>
             No autorizo
           </button>
           <button
@@ -118,14 +142,13 @@ export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
             disabled={!marcada}
             style={{
               ...e.botonAutoriza,
-              opacity: marcada ? 1 : 0.4,
+              background: marcada ? 'var(--orange)' : '#d9d9d9',
+              color: marcada ? '#fff' : '#8a8a8a',
               cursor: marcada ? 'pointer' : 'not-allowed',
             }}>
             Autorizo y continúo
           </button>
         </div>
-
-        <div style={e.version}>Versión {POLITICA_VERSION}</div>
       </div>
     </div>
   )
@@ -134,49 +157,80 @@ export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
 const e = {
   fondo: {
     position: 'fixed', inset: 0, zIndex: 9000,
-    background: 'rgba(16,24,40,0.80)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: 14, overflowY: 'auto',
-  },
-  tarjeta: {
-    background: '#fff', borderRadius: 18,
-    width: '100%', maxWidth: 520, maxHeight: '92vh',
+    background: '#f4f6fa',
     display: 'flex', flexDirection: 'column',
     fontFamily: 'Nunito, sans-serif',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.35)',
-    overflow: 'hidden',
   },
-  encabezado: { padding: '20px 24px 14px', borderBottom: '1px solid #f0f0f0' },
-  titulo: { fontSize: 18, fontWeight: 800, color: 'var(--blue)' },
-  ley: { fontSize: 11.5, color: '#999', marginTop: 3 },
-  cuerpo: { padding: '16px 24px', overflowY: 'auto', flex: 1 },
-  intro: { fontSize: 13.5, color: '#444', lineHeight: 1.6, margin: '0 0 16px' },
-  punto: { marginBottom: 13 },
-  puntoTitulo: { fontSize: 12.5, fontWeight: 800, color: '#1A2D5A', marginBottom: 3 },
-  puntoTexto: { fontSize: 12.5, color: '#555', lineHeight: 1.55 },
+  hoja: { flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' },
+  columna: {
+    maxWidth: 640, margin: '0 auto',
+    padding: '40px 20px 32px',
+  },
+
+  encabezado: { marginBottom: 32 },
+  titulo: {
+    fontSize: 28, lineHeight: 1.2, fontWeight: 800,
+    color: 'var(--blue)', margin: '0 0 14px',
+    letterSpacing: '-0.015em',
+  },
+  entrada: {
+    fontSize: 16, lineHeight: 1.65, color: '#4a5260', margin: 0,
+  },
+  nombre: { color: 'var(--blue)' },
+
+  puntos: { display: 'flex', flexDirection: 'column', gap: 24 },
+  punto: {},
+  puntoTitulo: {
+    fontSize: 16, fontWeight: 800, color: 'var(--blue)',
+    margin: '0 0 6px',
+  },
+  puntoTexto: {
+    fontSize: 15.5, lineHeight: 1.7, color: '#3f4650', margin: 0,
+  },
+
+  marco: {
+    marginTop: 32, padding: '22px 24px',
+    background: '#fff', borderRadius: 14,
+    borderLeft: '4px solid var(--blue)',
+  },
+  marcoTexto: {
+    fontSize: 14, lineHeight: 1.7, color: '#4a5260',
+    margin: '0 0 12px',
+  },
+
   casillaFila: {
-    display: 'flex', gap: 10, alignItems: 'flex-start',
-    marginTop: 18, padding: 13,
-    background: '#f6f8fc', borderRadius: 12, cursor: 'pointer',
+    display: 'flex', gap: 14, alignItems: 'flex-start',
+    marginTop: 28, padding: '20px 22px',
+    background: '#fff', borderRadius: 14,
+    border: '2px solid var(--blue)', cursor: 'pointer',
   },
-  casilla: { width: 19, height: 19, marginTop: 1, flexShrink: 0, cursor: 'pointer' },
-  casillaTexto: { fontSize: 12.5, color: '#333', lineHeight: 1.55 },
+  casilla: {
+    width: 22, height: 22, marginTop: 2,
+    flexShrink: 0, cursor: 'pointer', accentColor: '#1A2D5A',
+  },
+  casillaTexto: { fontSize: 15.5, lineHeight: 1.65, color: '#2b313a' },
+
+  version: {
+    fontSize: 12.5, color: '#9aa1ac',
+    margin: '20px 0 0', textAlign: 'center',
+  },
+
   pie: {
-    display: 'flex', gap: 10, padding: '14px 24px',
-    borderTop: '1px solid #f0f0f0', background: '#fafafa',
+    borderTop: '1px solid #e2e6ed', background: '#fff',
+    padding: '14px 20px',
+    paddingBottom: 'calc(14px + env(safe-area-inset-bottom, 0px))',
+  },
+  pieColumna: {
+    maxWidth: 640, margin: '0 auto',
+    display: 'flex', gap: 12,
   },
   botonRechazo: {
-    flex: 1, padding: 13, borderRadius: 12,
-    border: '2px solid #ddd', background: 'transparent', color: '#666',
-    fontFamily: 'inherit', fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
+    flex: 1, padding: '15px 12px', borderRadius: 12,
+    border: '2px solid #ccd2dc', background: 'transparent', color: '#5a616b',
+    fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer',
   },
   botonAutoriza: {
-    flex: 2, padding: 13, borderRadius: 12, border: 'none',
-    background: 'var(--orange)', color: '#fff',
-    fontFamily: 'inherit', fontSize: 13.5, fontWeight: 800,
-  },
-  version: {
-    textAlign: 'center', fontSize: 10.5, color: '#bbb',
-    padding: '0 0 12px', background: '#fafafa',
+    flex: 2, padding: '15px 12px', borderRadius: 12, border: 'none',
+    fontFamily: 'inherit', fontSize: 15, fontWeight: 800,
   },
 }
