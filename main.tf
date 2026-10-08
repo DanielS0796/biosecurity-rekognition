@@ -295,9 +295,14 @@ resource "aws_lambda_function" "validacion_biometrica" {
 # Lambda registro RRHH
 # ─────────────────────────────────────────
 data "archive_file" "lambda_registrar_zip" {
-  type        = "zip"
-  source_file = "${path.module}/lambda/registrar.js"
+  type = "zip"
+  # source_dir, no source_file: registrar.js hace require de
+  # ./instrument.js y de @aws-sdk y @sentry, así que un zip con el
+  # archivo suelto produce un Lambda que no arranca. Pasó: el primer
+  # apply que tocó este recurso tumbó el registro en producción.
+  source_dir  = "${path.module}/lambda"
   output_path = "${path.module}/lambda_build/registrar.zip"
+  excludes    = ["registrar.zip", "function.zip", "auditoria.zip", "liveness.zip", "reset.zip"]
 }
 
 resource "aws_lambda_function" "registrar_empleado" {
