@@ -165,6 +165,19 @@ resource "aws_iam_role_policy" "lambda_kms_policy" {
 # ─────────────────────────────────────────
 # Rekognition
 # ─────────────────────────────────────────
+# ─────────────────────────────────────────
+# Observabilidad compartida
+# ─────────────────────────────────────────
+# instrument.js lee estas tres. Se mezclan en el environment de cada
+# Lambda que hace require("./instrument") en vez de repetirlas: si
+# faltan, Sentry arranca sin DSN y no reporta nada, sin error visible.
+locals {
+  observabilidad = {
+    SENTRY_DSN = var.sentry_dsn
+    TEAM_GROUP = var.team_group
+  }
+}
+
 resource "aws_rekognition_collection" "coleccion" {
   collection_id = "coleccion2anlusoft"
   tags          = { Project = "anlusoft-rekognition" }
@@ -270,9 +283,10 @@ resource "aws_lambda_function" "validacion_biometrica" {
   timeout          = 30
   memory_size      = 256
   environment {
-    variables = {
+    variables = merge(local.observabilidad, {
       COLLECTION_ID = aws_rekognition_collection.coleccion.collection_id
-    }
+      MODULE_NAME   = "validacion-biometrica"
+    })
   }
   tags = { Project = "anlusoft-rekognition" }
 }
@@ -296,10 +310,11 @@ resource "aws_lambda_function" "registrar_empleado" {
   timeout          = 30
   memory_size      = 256
   environment {
-    variables = {
+    variables = merge(local.observabilidad, {
       COLLECTION_ID   = "coleccion2anlusoft"
       TABLE_EMPLEADOS = aws_dynamodb_table.empleados.name
-    }
+      MODULE_NAME     = "registrar-empleado"
+    })
   }
   tags = { Project = "anlusoft-rekognition" }
 }
@@ -323,7 +338,15 @@ resource "aws_lambda_function" "auditoria" {
   role             = aws_iam_role.lambda_role.arn
   timeout          = 60
   memory_size      = 512
-  tags             = { Project = "anlusoft-rekognition" }
+
+  environment {
+    variables = merge(local.observabilidad, {
+      MODULE_NAME  = "auditoria"
+      ZONA_HORARIA = "America/Bogota"
+    })
+  }
+
+  tags = { Project = "anlusoft-rekognition" }
 }
 
 # ─────────────────────────────────────────
@@ -765,7 +788,7 @@ resource "aws_lambda_function" "reset" {
   memory_size      = 256
 
   environment {
-    variables = {
+    variables = merge(local.observabilidad, {
       TABLA_USUARIOS      = aws_dynamodb_table.usuarios.name
       TABLA_CODIGOS       = aws_dynamodb_table.reset_codes.name
       MODULE_NAME         = "reset"
@@ -781,7 +804,7 @@ resource "aws_lambda_function" "reset" {
       ADMIN_EMERGENCIA_USUARIO = var.admin_emergencia_usuario
       ADMIN_EMERGENCIA_HASH    = var.admin_emergencia_hash
       ADMIN_EMERGENCIA_CORREO  = var.admin_emergencia_correo
-    }
+    })
   }
 
   tags = { Project = "anlusoft-rekognition" }

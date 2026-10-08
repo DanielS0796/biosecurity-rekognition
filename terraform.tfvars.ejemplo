@@ -9,3 +9,8 @@ smtp_clave   = "xxxx xxxx xxxx xxxx"
 admin_emergencia_usuario = "dfguatibonza"
 admin_emergencia_hash    = "scrypt$16384$8$1$...$..."
 admin_emergencia_correo  = "danielsuarez0796@gmail.com"
+
+# Observabilidad. Si se deja vacío, los Lambdas corren sin reportar
+# errores a Sentry (no fallan, simplemente no reportan nada).
+# El valor está en Sentry: Settings > Projects > Client Keys (DSN).
+sentry_dsn = ""

@@ -35,3 +35,22 @@ variable "admin_emergencia_correo" {
   type        = string
   default     = ""
 }
+
+# ── Observabilidad ────────────────────────────────────────────────────
+# El DSN estaba puesto a mano en la consola de cada Lambda, así que el
+# primer apply que tocó uno lo borró y Sentry quedó apagado sin avisar
+# (un dsn vacío no falla: simplemente no reporta nada). Acá queda
+# declarado para que no vuelva a pasar. El valor va en terraform.tfvars,
+# que no se versiona.
+variable "sentry_dsn" {
+  description = "DSN de Sentry para los Lambdas. Vacío = sin reporte de errores."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "team_group" {
+  description = "Etiqueta de equipo con la que Sentry agrupa los eventos."
+  type        = string
+  default     = "anlusoft"
+}

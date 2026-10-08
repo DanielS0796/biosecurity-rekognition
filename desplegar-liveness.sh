@@ -167,6 +167,8 @@ echo "────────────────────────�
 terraform apply -auto-approve \
   -target=aws_lambda_function.reset \
   -target=aws_lambda_function.auditoria \
+  -target=aws_lambda_function.registrar_empleado \
+  -target=aws_lambda_function.validacion_biometrica \
   -target=aws_lambda_function.liveness \
   -target=aws_iam_role_policy.lambda_liveness_policy \
   -target=aws_api_gateway_rest_api.api_liveness \
