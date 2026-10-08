@@ -24,8 +24,20 @@ CUENTA="${CUENTA_AWS:-968481485339}"
 # ── Chequeo previo ────────────────────────────────────────────────────
 # Las credenciales viven en la shell, no en el repo. Al abrir una
 # terminal nueva se pierden y el apply fallaba después de 3 pasos con
-# "No valid credential sources found". Mejor avisar acá, en 2 segundos.
-if ! aws sts get-caller-identity >/dev/null 2>&1; then
+# "No valid credential sources found". Mejor avisar acá, en dos segundos.
+#
+# El CLI de aws no está instalado en todas las máquinas, así que primero
+# se mira si hay credenciales de alguna forma (variables de entorno o
+# ~/.aws/credentials) y solo se usa `aws sts` si existe, para confirmar
+# que además son válidas.
+hay_credenciales() {
+  [ -n "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${AWS_SECRET_ACCESS_KEY:-}" ] && return 0
+  [ -n "${AWS_PROFILE:-}" ] && return 0
+  [ -s "${HOME}/.aws/credentials" ] && return 0
+  return 1
+}
+
+if ! hay_credenciales; then
   cat <<'FIN'
 No hay credenciales de AWS en esta terminal.
 
@@ -40,6 +52,14 @@ Se pierden cada vez que cierras la terminal: es a propósito, así no
 quedan escritas en ningún archivo del repo.
 FIN
   exit 1
+fi
+
+if command -v aws >/dev/null 2>&1; then
+  if ! aws sts get-caller-identity >/dev/null 2>&1; then
+    echo "Hay credenciales de AWS, pero AWS las rechaza."
+    echo "Revisa que no estén vencidas o con un typo, y vuelve a intentar."
+    exit 1
+  fi
 fi
 
 if [ ! -f terraform.tfvars ]; then
