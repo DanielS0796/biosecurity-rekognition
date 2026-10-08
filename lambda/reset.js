@@ -233,6 +233,18 @@ function temporalVencida(usuario) {
  * Correo
  * ════════════════════════════════════════════════════════════ */
 
+/**
+ * Escapa texto que va dentro del HTML de un correo. Importa sobre todo
+ * para la contraseña: el 23% de las generadas llevan "&", y un & crudo
+ * puede terminar interpretado como entidad. El usuario copiaría algo
+ * distinto de lo que se guardó, y el login fallaría sin explicación.
+ */
+const escaparHtml = (t) => String(t)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 const smtpConfigurado = () =>
     Boolean(process.env.SMTP_USUARIO && process.env.SMTP_CLAVE);
 
@@ -244,7 +256,7 @@ function enmascararCorreo(correo) {
     return `${visible}${"*".repeat(Math.max(local.length - 2, 1))}@${dominio}`;
 }
 
-async function enviarCorreo(destinatario, asunto, html) {
+async function enviarCorreo(destinatario, asunto, html, texto) {
     if (!smtpConfigurado()) {
         log("WARN", "SMTP sin configurar, no se envía correo", { destinatario });
         return;
@@ -254,6 +266,9 @@ async function enviarCorreo(destinatario, asunto, html) {
         to: destinatario,
         subject: asunto,
         html,
+        // Versión en texto plano: el cliente que la muestre entrega la
+        // contraseña tal cual, sin pasar por el sanitizador de HTML.
+        ...(texto ? { text: texto } : {}),
     });
 }
 
@@ -411,7 +426,8 @@ async function crearUsuario(body) {
     try {
         await enviarCorreo(correo,
             "Tu acceso a Biosecurity UCompensar",
-            correoClaveTemporal(usuario, temporal));
+            correoClaveTemporal(usuario, temporal),
+            textoClaveTemporal(usuario, temporal));
     } catch (e) {
         // Si el correo no sale, el usuario queda con una contraseña que
         // nadie conoce. Se deshace la creación en vez de dejar ese registro.
@@ -444,13 +460,30 @@ async function crearUsuario(body) {
 
 /** Cuerpo del correo que lleva la contraseña temporal. */
 function correoClaveTemporal(usuario, temporal) {
+    const u = escaparHtml(usuario);
     return plantilla(`
-        <p style="color:#333">Se creó tu usuario <strong>${usuario}</strong> en el sistema de control de acceso.</p>
-        <p style="color:#333">Usuario: <strong>${usuario}</strong></p>
+        <p style="color:#333">Se creó tu usuario <strong>${u}</strong> en el sistema de control de acceso.</p>
+        <p style="color:#333">Usuario: <strong>${u}</strong></p>
         <p style="color:#333">Contraseña temporal:</p>
-        <p style="font-family:monospace;font-size:20px;letter-spacing:2px;background:#f4f4f4;padding:14px 18px;border-radius:8px;color:#111;display:inline-block">${temporal}</p>
+        <p style="font-family:monospace;font-size:20px;background:#f4f4f4;padding:14px 18px;border-radius:8px;color:#111;display:inline-block">${escaparHtml(temporal)}</p>
         <p style="color:#333">Sirve únicamente para entrar una vez y elegir tu propia contraseña: el sistema te la va a pedir antes de dejarte usar nada. Vence en ${HORAS_CLAVE_TEMPORAL} horas.</p>
         <p style="color:#888;font-size:13px">Nadie más recibió esta contraseña. Si no esperabas este mensaje, avisa al área responsable y no la uses.</p>`);
+}
+
+/** El mismo correo en texto plano, sin nada que un cliente pueda reescribir. */
+function textoClaveTemporal(usuario, temporal) {
+    return [
+        `Se creó tu usuario en Biosecurity UCompensar.`,
+        ``,
+        `Usuario: ${usuario}`,
+        `Contraseña temporal: ${temporal}`,
+        ``,
+        `Sirve únicamente para entrar y elegir tu propia contraseña.`,
+        `Vence en ${HORAS_CLAVE_TEMPORAL} horas.`,
+        ``,
+        `Nadie más recibió esta contraseña. Si no esperabas este mensaje,`,
+        `avisa al área responsable y no la uses.`,
+    ].join("\n");
 }
 
 async function eliminarUsuario(body) {

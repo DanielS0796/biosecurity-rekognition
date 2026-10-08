@@ -36,12 +36,17 @@ const reset = () => {
 const CLAVE_OK = 'Ucomp2026!Seg';
 
 /**
- * Saca la contraseña temporal del HTML del correo. El Lambda ya no la
- * devuelve en la respuesta, así que el correo es el único lugar de donde
- * se puede leer — igual que para la persona que la recibe.
+ * Saca la contraseña temporal del correo. El Lambda ya no la devuelve en
+ * la respuesta, así que el correo es el único lugar de donde se puede
+ * leer — igual que para la persona que la recibe.
+ *
+ * Se lee de la parte en texto plano a propósito: el HTML lleva la
+ * contraseña escapada, y leer de ahí haría que una contraseña con "&"
+ * pasara la prueba sin pasar en la realidad.
  */
-function extraerTemporal(html) {
-  const m = html.match(/font-family:monospace[^>]*>([^<]+)</);
+function extraerTemporal(correo) {
+  const texto = typeof correo === 'string' ? correo : correo.text;
+  const m = texto.match(/Contraseña temporal: (.+)/);
   return m ? m[1].trim() : null;
 }
 
@@ -61,7 +66,7 @@ console.log('\n── 2. La temporal viaja por correo y solo por ahí ──');
 check('se envió un correo', mail.__enviados.length === 1);
 check('fue al correo del usuario', mail.__enviados[0].to === 'ana@x.test');
 // La temporal se recupera del correo, que es el único lugar donde está.
-const temporal = extraerTemporal(mail.__enviados[0].html);
+const temporal = extraerTemporal(mail.__enviados[0]);
 check('el correo lleva una temporal', typeof temporal === 'string' && temporal.length >= 12,
   String(temporal));
 check('no quedó en claro en el registro',
@@ -180,7 +185,7 @@ check('sin roles válidos cae en el mínimo', dyn.__estado.usuarios['eva'].rol.S
 console.log('\n── 13. Quien crea el usuario nunca ve la contraseña ──');
 reset();
 r = await pedir({ accion: 'crear_usuario', usuario: 'sol', correo: 'sol@x.test', rol: 'auditoria' });
-const temporalSol = extraerTemporal(mail.__enviados[0].html);
+const temporalSol = extraerTemporal(mail.__enviados[0]);
 const respuesta = JSON.stringify(r.body);
 check('la temporal no aparece en la respuesta', !respuesta.includes(temporalSol), respuesta);
 // Con la temporal en mano se entra, así que la que llegó por correo es la
@@ -192,7 +197,7 @@ check('y pide cambiarla', r.body.debe_cambiar_clave === true);
 console.log('\n── 14. La temporal vence sola ──');
 reset();
 await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
-const temporalAna = extraerTemporal(mail.__enviados[0].html);
+const temporalAna = extraerTemporal(mail.__enviados[0]);
 check('se guardó la fecha de vencimiento', !!dyn.__estado.usuarios['ana'].clave_temporal_expira);
 // Se mueve el vencimiento al pasado en vez de esperar 72 horas.
 dyn.__estado.usuarios['ana'].clave_temporal_expira = { S: new Date(Date.now() - 1000).toISOString() };
@@ -205,7 +210,7 @@ check('vencida tampoco sirve para cambiarla', r.status === 403, JSON.stringify(r
 console.log('\n── 15. Elegir la contraseña propia borra el vencimiento ──');
 reset();
 await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
-const temporalViva = extraerTemporal(mail.__enviados[0].html);
+const temporalViva = extraerTemporal(mail.__enviados[0]);
 r = await pedir({ accion: 'cambiar_clave', email: 'ana', clave_actual: temporalViva, nueva_clave: CLAVE_OK });
 check('cambia bien', r.body.codigo === 0, JSON.stringify(r.body));
 check('devuelve el rol para entrar directo', JSON.stringify(r.body.rol) === '["rrhh"]',
@@ -220,7 +225,7 @@ check('la temporal ya no sirve', r.status === 401);
 console.log('\n── 16. Una temporal vencida se recupera sin ayuda de nadie ──');
 reset();
 await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
-const vencida = extraerTemporal(mail.__enviados[0].html);
+const vencida = extraerTemporal(mail.__enviados[0]);
 dyn.__estado.usuarios['ana'].clave_temporal_expira = { S: new Date(Date.now() - 1000).toISOString() };
 r = await pedir({ accion: 'login', email: 'ana', clave: vencida });
 check('vencida no entra', r.status === 403);
@@ -252,6 +257,30 @@ check('responde que falló', r.status === 502, JSON.stringify(r.body));
 check('y no deja el usuario creado', !dyn.__estado.usuarios['nadie'],
   JSON.stringify(dyn.__estado.usuarios['nadie']));
 mail.__transporte.sendMail = enviarOriginal;
+
+console.log('\n── 18. Una contraseña con & sobrevive al correo ──');
+// El 23% de las temporales llevan "&". Si va cruda en el HTML puede
+// leerse como entidad, y el usuario copiaría algo que no es su
+// contraseña. Se crean usuarios hasta dar con una y se prueba entera.
+let conAmpersand = null, intentos = 0;
+while (!conAmpersand && intentos < 60) {
+  reset();
+  const nombre = `u${intentos}`;
+  await pedir({ accion: 'crear_usuario', usuario: nombre, correo: `${nombre}@x.test`, rol: 'rrhh' });
+  const t = extraerTemporal(mail.__enviados[0]);
+  if (t && t.includes('&')) conAmpersand = { nombre, temporal: t, correo: mail.__enviados[0] };
+  intentos++;
+}
+check('se encontró una con & para probar', !!conAmpersand, `tras ${intentos} intentos`);
+if (conAmpersand) {
+  check('el HTML la lleva escapada',
+    conAmpersand.correo.html.includes(conAmpersand.temporal.replace(/&/g, '&amp;')),
+    'el & viaja crudo en el HTML');
+  check('el texto plano la lleva tal cual',
+    conAmpersand.correo.text.includes(conAmpersand.temporal));
+  r = await pedir({ accion: 'login', email: conAmpersand.nombre, clave: conAmpersand.temporal });
+  check('y con ella se entra', r.body.codigo === 0, JSON.stringify(r.body));
+}
 
 console.log(`\n${'─'.repeat(52)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
