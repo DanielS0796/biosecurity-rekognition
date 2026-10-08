@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 /**
  * Autorización para el tratamiento de datos biométricos.
@@ -71,8 +72,16 @@ const PUNTOS = [
 
 export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
   const [marcada, setMarcada] = useState(false)
+  const [montado, setMontado] = useState(false)
 
-  return (
+  // Se dibuja desde un portal sobre document.body. La tarjeta que la
+  // contiene tiene backdrop-filter, y eso convierte a ese elemento en el
+  // marco de referencia de los position:fixed que lleva dentro: sin el
+  // portal, esta pantalla queda encerrada en la tarjeta y aplastada.
+  useEffect(() => { setMontado(true) }, [])
+  if (!montado) return null
+
+  const pantalla = (
     <div style={e.fondo}>
       <div style={e.hoja}>
         <div style={e.columna}>
@@ -152,6 +161,8 @@ export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
       </div>
     </div>
   )
+
+  return createPortal(pantalla, document.body)
 }
 
 const e = {
