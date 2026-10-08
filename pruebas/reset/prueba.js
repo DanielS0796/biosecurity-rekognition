@@ -282,6 +282,52 @@ if (conAmpersand) {
   check('y con ella se entra', r.body.codigo === 0, JSON.stringify(r.body));
 }
 
+console.log('\n── 19. Cambiar los roles de un usuario que ya existe ──');
+reset();
+await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
+await pedir({ accion: 'crear_usuario', usuario: 'beto', correo: 'b@x.test', rol: 'rrhh' });
+r = await pedir({ accion: 'cambiar_roles', usuario: 'beto', rol: 'rrhh,auditoria', usuario_actual: 'ana' });
+check('da los dos roles', r.body.codigo === 0, JSON.stringify(r.body));
+check('quedan guardados', dyn.__estado.usuarios['beto'].rol.S === 'rrhh,auditoria',
+  dyn.__estado.usuarios['beto'].rol.S);
+r = await pedir({ accion: 'login', email: 'beto', clave: 'x' });
+r = await pedir({ accion: 'cambiar_roles', usuario: 'beto', rol: 'auditoria', usuario_actual: 'ana' });
+check('se le puede dejar solo auditoría', JSON.stringify(r.body.rol) === '["auditoria"]',
+  JSON.stringify(r.body.rol));
+check('no se pierde el correo', dyn.__estado.usuarios['beto'].correo_reset.S === 'b@x.test');
+check('ni la contraseña', dyn.__estado.usuarios['beto'].password.S.startsWith('scrypt$'));
+
+console.log('\n── 20. Las guardas de los roles ──');
+r = await pedir({ accion: 'cambiar_roles', usuario: 'beto', rol: 'superadmin', usuario_actual: 'ana' });
+check('un rol inventado no pasa como vacío', r.status === 400, JSON.stringify(r.body));
+check('y no toca lo guardado', dyn.__estado.usuarios['beto'].rol.S === 'auditoria');
+
+r = await pedir({ accion: 'cambiar_roles', usuario: 'ana', rol: 'auditoria', usuario_actual: 'ana' });
+check('no te puedes quitar registro a ti mismo', r.status === 400, r.body.descripcion);
+
+// ana es la única con rrhh (beto quedó en auditoria): quitárselo desde
+// otra cuenta dejaría el sistema sin nadie que administre usuarios.
+r = await pedir({ accion: 'cambiar_roles', usuario: 'ana', rol: 'auditoria', usuario_actual: 'beto' });
+check('tampoco al último con registro', r.status === 400, r.body.descripcion);
+check('ana conserva su rol', dyn.__estado.usuarios['ana'].rol.S === 'rrhh');
+
+// Con dos que administren, sí se puede.
+await pedir({ accion: 'cambiar_roles', usuario: 'beto', rol: 'rrhh,auditoria', usuario_actual: 'ana' });
+r = await pedir({ accion: 'cambiar_roles', usuario: 'ana', rol: 'auditoria', usuario_actual: 'beto' });
+check('con otro administrador sí se puede', r.body.codigo === 0, JSON.stringify(r.body));
+
+r = await pedir({ accion: 'cambiar_roles', usuario: 'rescate', rol: 'auditoria', usuario_actual: 'beto' });
+check('el admin de emergencia no se toca', r.status === 400, r.body.descripcion);
+r = await pedir({ accion: 'cambiar_roles', usuario: 'fantasma', rol: 'rrhh', usuario_actual: 'beto' });
+check('ni un usuario que no existe', r.status === 404);
+
+console.log('\n── 21. La lista marca al admin de emergencia ──');
+r = await pedir({ accion: 'listar_usuarios' });
+const rescate = r.body.items.find(i => i.usuario === 'rescate');
+const normal = r.body.items.find(i => i.usuario === 'beto');
+check('el de emergencia viene marcado', rescate?.es_emergencia === true);
+check('los normales no', normal?.es_emergencia === false);
+
 console.log(`\n${'─'.repeat(52)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();

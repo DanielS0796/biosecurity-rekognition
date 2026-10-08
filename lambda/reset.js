@@ -458,6 +458,74 @@ async function crearUsuario(body) {
     });
 }
 
+/**
+ * Cambia los roles de un usuario que ya existe.
+ *
+ * Hasta que la separación de privilegios empezó a aplicarse de verdad,
+ * obtenerUsuario devolvía ["rrhh","auditoria"] a todo el mundo y el
+ * campo rol no servía para nada. Al arreglarlo, los usuarios creados
+ * antes se quedaron con lo que tuvieran guardado. Esto es para
+ * corregirlos sin recrearlos.
+ */
+async function cambiarRoles(body) {
+    const { usuario, rol, usuario_actual } = body;
+    if (!usuario) return error(400, "Falta el usuario");
+
+    const pedidos = Array.isArray(rol) ? rol : String(rol || "").split(",");
+    const validos = [...new Set(
+        pedidos.map(r => String(r).trim().toLowerCase()).filter(r => ROLES_VALIDOS.includes(r))
+    )];
+
+    // Acá no se usa normalizarRoles: su respaldo silencioso a ["rrhh"]
+    // tiene sentido al crear, pero en una edición convertiría un error
+    // de la interfaz en un cambio de permisos que nadie pidió.
+    if (!validos.length) return error(400, "Selecciona al menos un rol válido");
+
+    if (ADMIN_EMERGENCIA && usuario === ADMIN_EMERGENCIA) {
+        return error(400, "El usuario de emergencia se administra por configuración");
+    }
+
+    const registro = await obtenerUsuario(usuario);
+    if (!registro || !registro.desde_dynamo) return error(404, "El usuario no existe");
+
+    // Quitarse a uno mismo el rol de registro es encerrarse afuera: sin
+    // él no se vuelve a entrar a esta pantalla para deshacerlo.
+    if (usuario === usuario_actual && !validos.includes("rrhh")) {
+        return error(400, "No puedes quitarte a ti mismo el permiso de registro");
+    }
+
+    // Y dejar la tabla sin nadie que administre usuarios tiene el mismo
+    // efecto para todos. El admin de emergencia sigue siendo la salida,
+    // pero no es una situación a la que se deba llegar por un clic.
+    if (!validos.includes("rrhh") && registro.rol.includes("rrhh")) {
+        const todos = await dynamo.send(new ScanCommand({ TableName: TABLA_USUARIOS }));
+        const conRegistro = (todos.Items || [])
+            .filter(i => normalizarRoles(i.rol?.S).includes("rrhh"))
+            .map(i => i.email?.S);
+        if (conRegistro.length <= 1) {
+            return error(400, "Es el único usuario con permiso de registro. Dale ese permiso a otro antes de quitárselo a este.");
+        }
+    }
+
+    await dynamo.send(new UpdateItemCommand({
+        TableName: TABLA_USUARIOS,
+        Key: { email: { S: usuario } },
+        UpdateExpression: "SET #rol = :r, updated_at = :u",
+        ExpressionAttributeNames: { "#rol": "rol" },
+        ExpressionAttributeValues: {
+            ":r": { S: validos.join(",") },
+            ":u": { S: new Date().toISOString() },
+        },
+    }));
+
+    log("INFO", "Roles cambiados", { usuario, antes: registro.rol, ahora: validos });
+    return responder(200, {
+        codigo: 0,
+        descripcion: `Permisos de ${usuario} actualizados`,
+        rol: validos,
+    });
+}
+
 /** Cuerpo del correo que lleva la contraseña temporal. */
 function correoClaveTemporal(usuario, temporal) {
     const u = escaparHtml(usuario);
@@ -511,6 +579,7 @@ async function listarUsuarios() {
         rol: normalizarRoles(i.rol?.S),
         debe_cambiar_clave: i.debe_cambiar_clave?.BOOL === true,
         created_at: i.created_at?.S || "",
+        es_emergencia: false,
     }));
 
     if (ADMIN_EMERGENCIA && !items.some(i => i.usuario === ADMIN_EMERGENCIA)) {
@@ -520,6 +589,10 @@ async function listarUsuarios() {
             rol: ["rrhh", "auditoria"],
             debe_cambiar_clave: false,
             created_at: "",
+            // Lo marca el servidor y no el front: deducirlo de un
+            // created_at vacío confundiría a los registros viejos que
+            // tampoco lo tienen.
+            es_emergencia: true,
         });
     }
 
@@ -673,6 +746,7 @@ function politica() {
 const ACCIONES = {
     login,
     crear_usuario: crearUsuario,
+    cambiar_roles: cambiarRoles,
     eliminar_usuario: eliminarUsuario,
     listar_usuarios: listarUsuarios,
     solicitar: solicitarCodigo,

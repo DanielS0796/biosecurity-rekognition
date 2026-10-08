@@ -51,6 +51,9 @@ export default function RRHH() {
   // La temporal la genera el servidor y viaja solo por correo al usuario.
   // Acá no se guarda la contraseña, únicamente la confirmación del envío.
   const [avisoEnvio, setAvisoEnvio] = useState(null)
+  // Roles en edición, por usuario. Solo entra el que se está tocando.
+  const [rolesEditados, setRolesEditados] = useState({})
+  const [guardandoRoles, setGuardandoRoles] = useState(null)
   const [crearOk, setCrearOk] = useState('')
   const [crearErr, setCrearErr] = useState('')
   const [crearLoading, setCrearLoading] = useState(false)
@@ -267,6 +270,45 @@ export default function RRHH() {
       alerta(setCrearErr, '⚠️ Error de conexión')
     }
     setCrearLoading(false)
+  }
+
+  function alternarRolDe(usuario, rolesActuales, rol) {
+    const actual = rolesEditados[usuario] || rolesActuales
+    const siguiente = actual.includes(rol)
+      ? actual.filter(r => r !== rol)
+      : [...actual, rol]
+    setRolesEditados(prev => ({ ...prev, [usuario]: siguiente }))
+  }
+
+  async function guardarRoles(usuario) {
+    const roles = rolesEditados[usuario]
+    if (!roles) return
+    setGuardandoRoles(usuario)
+    try {
+      const r = await fetch(API_RESET, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accion: 'cambiar_roles',
+          usuario,
+          rol: roles.join(','),
+          usuario_actual: usuarioActual,
+        }),
+      })
+      const data = await r.json()
+      const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
+      if (body.codigo === 0) {
+        playSound('success')
+        setRolesEditados(prev => { const n = { ...prev }; delete n[usuario]; return n })
+        cargarUsuarios()
+      } else {
+        playSound('error')
+        alerta(setCrearErr, body.descripcion || 'No se pudieron cambiar los permisos')
+      }
+    } catch {
+      alerta(setCrearErr, '⚠️ Error de conexión')
+    }
+    setGuardandoRoles(null)
   }
 
   function alternarRol(rol) {
@@ -715,18 +757,71 @@ export default function RRHH() {
               <button onClick={cargarUsuarios} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>Actualizar</button>
             </div>
             {usuariosLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13 }}>⏳ Cargando...</div>}
-            {usuarios.map(u => (
-              <div key={u.usuario} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                <div>
-                  <div style={{ fontWeight: 800, color: '#1A2D5A', fontSize: 14 }}>{u.usuario}</div>
-                  <div style={{ fontSize: 12, color: '#888' }}>{u.correo || 'Sin correo registrado'}</div>
+            {usuarios.map(u => {
+              const roles = rolesEditados[u.usuario] || u.rol || []
+              const cambiado = !!rolesEditados[u.usuario]
+              const esEmergencia = u.es_emergencia === true
+              return (
+              <div key={u.usuario} style={{ padding: '12px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 800, color: '#1A2D5A', fontSize: 14 }}>{u.usuario}</div>
+                    <div style={{ fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {u.correo || 'Sin correo registrado'}
+                    </div>
+                  </div>
+                  {u.usuario !== usuarioActual
+                    ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer', flexShrink: 0 }}>🗑️ Eliminar</button>
+                    : <span style={{ fontSize: 11, color: '#888', fontStyle: 'italic', flexShrink: 0 }}>Tú</span>
+                  }
                 </div>
-                {u.usuario !== usuarioActual
-                  ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>🗑️ Eliminar</button>
-                  : <span style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>Tú</span>
-                }
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                  {[['rrhh', 'Registro'], ['auditoria', 'Auditoría']].map(([clave, texto]) => {
+                    const activo = roles.includes(clave)
+                    return (
+                      <button
+                        key={clave}
+                        onClick={() => !esEmergencia && alternarRolDe(u.usuario, u.rol || [], clave)}
+                        disabled={esEmergencia}
+                        style={{
+                          border: activo ? '2px solid #1A2D5A' : '2px solid #e0e0e0',
+                          background: activo ? '#1A2D5A' : 'transparent',
+                          color: activo ? '#fff' : '#999',
+                          fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700,
+                          padding: '5px 12px', borderRadius: 14,
+                          cursor: esEmergencia ? 'not-allowed' : 'pointer',
+                          opacity: esEmergencia ? 0.5 : 1,
+                        }}>
+                        {activo ? '✓ ' : ''}{texto}
+                      </button>
+                    )
+                  })}
+
+                  {cambiado && (
+                    <button
+                      onClick={() => guardarRoles(u.usuario)}
+                      disabled={guardandoRoles === u.usuario}
+                      style={{ border: 'none', background: 'var(--orange)', color: '#fff', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 14, cursor: 'pointer' }}>
+                      {guardandoRoles === u.usuario ? '⏳' : 'Guardar'}
+                    </button>
+                  )}
+                  {cambiado && (
+                    <button
+                      onClick={() => setRolesEditados(prev => { const n = { ...prev }; delete n[u.usuario]; return n })}
+                      style={{ border: 'none', background: 'transparent', color: '#888', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 6px', cursor: 'pointer' }}>
+                      Cancelar
+                    </button>
+                  )}
+                  {esEmergencia && (
+                    <span style={{ fontSize: 10.5, color: '#aaa', fontStyle: 'italic' }}>
+                      se configura en el servidor
+                    </span>
+                  )}
+                </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
