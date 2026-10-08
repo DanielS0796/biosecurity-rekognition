@@ -328,6 +328,49 @@ const normal = r.body.items.find(i => i.usuario === 'beto');
 check('el de emergencia viene marcado', rescate?.es_emergencia === true);
 check('los normales no', normal?.es_emergencia === false);
 
+console.log('\n── 22. Un usuario real con el nombre del admin de emergencia ──');
+// Pasó en producción: existía 'rescate' en la base además de en la
+// variable de entorno. obtenerUsuario mira DynamoDB primero, así que al
+// iniciar sesión manda el de la base — y por tanto tiene que poder
+// editarse, aunque se llame igual que el de emergencia.
+reset();
+await pedir({ accion: 'crear_usuario', usuario: 'otro', correo: 'o@x.test', rol: 'rrhh' });
+
+// Hoy crear_usuario rechaza este nombre, porque obtenerUsuario
+// encuentra al de la variable y responde "ya existe". El registro de
+// Daniel es anterior a que esa variable existiera, así que se siembra
+// directo, que es como llegó a estar ahí.
+dyn.__estado.usuarios['rescate'] = {
+  email: { S: 'rescate' },
+  password: { S: 'scrypt$16384$8$1$aa$bb' },
+  correo_reset: { S: 'r@x.test' },
+  rol: { S: 'rrhh' },
+  debe_cambiar_clave: { BOOL: false },
+  created_at: { S: '2026-01-01T00:00:00.000Z' },
+};
+
+r = await pedir({ accion: 'crear_usuario', usuario: 'rescate', correo: 'r@x.test', rol: 'rrhh' });
+check('no se puede crear uno nuevo con ese nombre', r.status === 400, JSON.stringify(r.body));
+
+r = await pedir({ accion: 'listar_usuarios' });
+const fila = r.body.items.find(i => i.usuario === 'rescate');
+check('la lista lo trae como usuario normal', fila?.es_emergencia === false,
+  JSON.stringify(fila));
+
+r = await pedir({ accion: 'cambiar_roles', usuario: 'rescate', rol: 'rrhh,auditoria', usuario_actual: 'otro' });
+check('se le pueden cambiar los permisos', r.body.codigo === 0, r.body.descripcion);
+check('y quedan guardados', dyn.__estado.usuarios['rescate'].rol.S === 'rrhh,auditoria');
+
+r = await pedir({ accion: 'eliminar_usuario', usuario: 'rescate', usuario_actual: 'otro' });
+check('y se puede eliminar', r.body.codigo === 0, r.body.descripcion);
+
+// Sin registro en la base vuelve a mandar la variable de entorno, y
+// entonces sí queda protegido.
+r = await pedir({ accion: 'cambiar_roles', usuario: 'rescate', rol: 'auditoria', usuario_actual: 'otro' });
+check('ya sin registro, vuelve a estar protegido', r.status === 400, r.body.descripcion);
+r = await pedir({ accion: 'eliminar_usuario', usuario: 'rescate', usuario_actual: 'otro' });
+check('tampoco se elimina el de la variable', r.status === 400, r.body.descripcion);
+
 console.log(`\n${'─'.repeat(52)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();

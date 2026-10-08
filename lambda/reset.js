@@ -481,12 +481,17 @@ async function cambiarRoles(body) {
     // de la interfaz en un cambio de permisos que nadie pidió.
     if (!validos.length) return error(400, "Selecciona al menos un rol válido");
 
-    if (ADMIN_EMERGENCIA && usuario === ADMIN_EMERGENCIA) {
+    // El orden importa: se mira si hay registro en la base antes que el
+    // nombre. Si alguien creó un usuario real con el mismo nombre que el
+    // admin de emergencia, ese registro es el que manda al iniciar
+    // sesión —obtenerUsuario consulta DynamoDB primero—, así que tiene
+    // que poder editarse. Comparar solo el nombre dejaba a ese usuario
+    // congelado con los permisos que tuviera.
+    const registro = await obtenerUsuario(usuario);
+    if (!registro) return error(404, "El usuario no existe");
+    if (!registro.desde_dynamo) {
         return error(400, "El usuario de emergencia se administra por configuración");
     }
-
-    const registro = await obtenerUsuario(usuario);
-    if (!registro || !registro.desde_dynamo) return error(404, "El usuario no existe");
 
     // Quitarse a uno mismo el rol de registro es encerrarse afuera: sin
     // él no se vuelve a entrar a esta pantalla para deshacerlo.
@@ -558,7 +563,12 @@ async function eliminarUsuario(body) {
     const { usuario, usuario_actual } = body;
     if (!usuario) return error(400, "Falta el usuario a eliminar");
     if (usuario === usuario_actual) return error(400, "No puedes eliminar tu propio usuario");
-    if (ADMIN_EMERGENCIA && usuario === ADMIN_EMERGENCIA) {
+
+    // Igual que en cambiarRoles: el de emergencia no se puede borrar
+    // porque no está en la base, pero un usuario real con ese mismo
+    // nombre sí, y de hecho conviene poder quitarlo.
+    const registro = await obtenerUsuario(usuario);
+    if (registro && !registro.desde_dynamo) {
         return error(400, "No se puede eliminar el usuario de emergencia");
     }
 
