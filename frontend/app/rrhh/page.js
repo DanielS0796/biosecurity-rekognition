@@ -156,7 +156,7 @@ export default function RRHH() {
     setAutorizacion(null)
     setPasoRegistro('datos')
     alerta(setRegErr,
-      'Sin autorización no se puede registrar el rostro. Esa persona ingresa presentando documento en portería.',
+      'Sin autorización no se registra el rostro. El ingreso de esa persona se gestiona por otro medio.',
       9000)
   }
 

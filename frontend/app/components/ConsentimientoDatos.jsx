@@ -51,12 +51,16 @@ const PUNTOS = [
     titulo: 'Tus derechos',
     texto: 'Puedes conocer, actualizar, rectificar y revocar esta autorización cuando ' +
       `quieras, sin dar explicaciones, escribiendo a ${CANAL_HABEAS_DATA}. ` +
-      'Si revocas, se elimina el dato biométrico y el ingreso pasa a hacerse con documento.',
+      'Si revocas, se elimina el dato biométrico y tu ingreso se gestiona por otro medio.',
   },
   {
     titulo: 'Si prefieres no autorizar',
-    texto: 'No estás obligado. Puedes ingresar presentando tu documento en portería, ' +
-      'sin ningún trámite adicional ni consecuencia para ti.',
+    // Antes esto prometía el ingreso con documento en portería. Lo
+    // quitamos: la app no controla la entrada física y no puede
+    // garantizar algo que depende de otra área. Queda lo que sí es
+    // cierto y lo que la persona necesita saber para decidir.
+    texto: 'No estás obligado. Si no autorizas, no se registra tu rostro ni se guarda ' +
+      'ningún dato biométrico tuyo, y tu ingreso se gestiona por otro medio.',
   },
 ]
 

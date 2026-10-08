@@ -720,8 +720,8 @@ async function enviarConstancia(correo, nombre, identificacion, fecha, version) 
         `esta autorización cuando quieras, sin dar explicaciones,`,
         `escribiendo a ${CANAL_HABEAS_DATA}.`,
         ``,
-        `Si revocas, se elimina el dato biométrico y el ingreso pasa a`,
-        `hacerse presentando documento.`,
+        `Si revocas, se elimina el dato biométrico y tu ingreso se`,
+        `gestiona por otro medio.`,
         ``,
         `Ley 1581 de 2012 y Decreto 1377 de 2013.`,
     ].join("\n");
@@ -745,7 +745,7 @@ async function enviarConstancia(correo, nombre, identificacion, fecha, version) 
     <p style="font-size:14px"><strong>Qué se guardó.</strong> Un vector matemático derivado de tu rostro, no la fotografía. Ese vector no permite reconstruir tu cara.</p>
     <p style="font-size:14px"><strong>Para qué.</strong> Verificar tu identidad al entrar a las instalaciones. Ninguna otra finalidad.</p>
     <p style="font-size:14px"><strong>Por cuánto tiempo.</strong> Mientras mantengas tu vínculo con la institución. Al terminar, el vector se elimina de la colección biométrica.</p>
-    <p style="font-size:14px"><strong>Tus derechos.</strong> Puedes conocer, actualizar, rectificar y revocar esta autorización cuando quieras, sin dar explicaciones, escribiendo a <a href="mailto:${CANAL_HABEAS_DATA}">${CANAL_HABEAS_DATA}</a>. Si revocas, se elimina el dato biométrico y el ingreso pasa a hacerse presentando documento.</p>
+    <p style="font-size:14px"><strong>Tus derechos.</strong> Puedes conocer, actualizar, rectificar y revocar esta autorización cuando quieras, sin dar explicaciones, escribiendo a <a href="mailto:${CANAL_HABEAS_DATA}">${CANAL_HABEAS_DATA}</a>. Si revocas, se elimina el dato biométrico y tu ingreso se gestiona por otro medio.</p>
     <p style="font-size:12px;color:#888;margin-top:20px">Ley 1581 de 2012 y Decreto 1377 de 2013.</p>
   </div>
 </div>`;
