@@ -790,8 +790,11 @@ export default function RRHH() {
                           color: activo ? '#fff' : '#999',
                           fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700,
                           padding: '5px 12px', borderRadius: 14,
-                          cursor: esEmergencia ? 'not-allowed' : 'pointer',
-                          opacity: esEmergencia ? 0.5 : 1,
+                          // Sin opacidad rebajada: un chip encendido al 50%
+                          // se lee como apagado, y entonces la fila parece
+                          // decir que el usuario no tiene permisos cuando
+                          // tiene los dos.
+                          cursor: esEmergencia ? 'default' : 'pointer',
                         }}>
                         {activo ? '✓ ' : ''}{texto}
                       </button>
@@ -814,8 +817,8 @@ export default function RRHH() {
                     </button>
                   )}
                   {esEmergencia && (
-                    <span style={{ fontSize: 10.5, color: '#aaa', fontStyle: 'italic' }}>
-                      se configura en el servidor
+                    <span style={{ fontSize: 10.5, color: '#888', fontStyle: 'italic' }}>
+                      siempre tiene los dos · se cambia en el servidor
                     </span>
                   )}
                 </div>
