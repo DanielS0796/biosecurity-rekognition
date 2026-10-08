@@ -21,6 +21,33 @@ set -uo pipefail
 
 CUENTA="${CUENTA_AWS:-968481485339}"
 
+# ── Chequeo previo ────────────────────────────────────────────────────
+# Las credenciales viven en la shell, no en el repo. Al abrir una
+# terminal nueva se pierden y el apply fallaba después de 3 pasos con
+# "No valid credential sources found". Mejor avisar acá, en 2 segundos.
+if ! aws sts get-caller-identity >/dev/null 2>&1; then
+  cat <<'FIN'
+No hay credenciales de AWS en esta terminal.
+
+Expórtalas y vuelve a correr el script:
+
+  export AWS_ACCESS_KEY_ID="..."
+  export AWS_SECRET_ACCESS_KEY="..."
+  export AWS_DEFAULT_REGION="us-east-1"
+  ./desplegar-liveness.sh
+
+Se pierden cada vez que cierras la terminal: es a propósito, así no
+quedan escritas en ningún archivo del repo.
+FIN
+  exit 1
+fi
+
+if [ ! -f terraform.tfvars ]; then
+  echo "Falta terraform.tfvars (claves SMTP y admin de emergencia)."
+  echo "Cópialo del ejemplo:  cp terraform.tfvars.ejemplo terraform.tfvars"
+  exit 1
+fi
+
 echo "──────────────────────────────────────────────────"
 echo " Paso 1 de 5 — dependencias del Lambda"
 echo "──────────────────────────────────────────────────"
