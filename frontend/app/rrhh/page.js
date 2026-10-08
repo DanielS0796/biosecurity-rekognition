@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { API_RRHH_URL, API_RESET, API_KEY_RRHH } from '../config'
 import LivenessScan from '../components/LivenessScan'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
+import ConsentimientoDatos from '../components/ConsentimientoDatos'
 
 export default function RRHH() {
   const [logueado, setLogueado] = useState(false)
@@ -50,6 +51,11 @@ export default function RRHH() {
   const [nuevoRoles, setNuevoRoles] = useState(['rrhh'])
   // La temporal la genera el servidor y viaja solo por correo al usuario.
   // Acá no se guarda la contraseña, únicamente la confirmación del envío.
+  const [correoEmpleado, setCorreoEmpleado] = useState('')
+  // Autorización de la persona que se va a registrar. Se guarda acá
+  // entre que la da y el escaneo termina; no se persiste en el
+  // navegador, la constancia que vale es la del servidor.
+  const [autorizacion, setAutorizacion] = useState(null)
   const [avisoEnvio, setAvisoEnvio] = useState(null)
   // Roles en edición, por usuario. Solo entra el que se está tocando.
   const [rolesEditados, setRolesEditados] = useState({})
@@ -128,10 +134,30 @@ export default function RRHH() {
       alerta(setRegErr, 'Complete la identificación y el nombre antes de escanear')
       return
     }
+    if (!correoEmpleado.trim()) {
+      alerta(setRegErr, 'Falta el correo de la persona: ahí le llega la constancia de su autorización')
+      return
+    }
     setRegErr('')
     setRegOk('')
     setResultadoRegistro(null)
+    // El consentimiento va antes de la cámara. Capturar primero y
+    // preguntar después sería tratar el dato sin permiso, que es
+    // exactamente lo que la ley no admite.
+    setPasoRegistro('consentimiento')
+  }
+
+  function autorizaDatos(constancia) {
+    setAutorizacion(constancia)
     setPasoRegistro('escaneo')
+  }
+
+  function rechazaDatos() {
+    setAutorizacion(null)
+    setPasoRegistro('datos')
+    alerta(setRegErr,
+      'Sin autorización no se puede registrar el rostro. Esa persona ingresa presentando documento en portería.',
+      9000)
   }
 
   function registroExitoso(datos) {
@@ -148,12 +174,15 @@ export default function RRHH() {
   }
 
   function cancelarEscaneo() {
+    setAutorizacion(null)
     setPasoRegistro('datos')
   }
 
   function nuevoRegistro() {
     setIdentificacion('')
     setNombre('')
+    setCorreoEmpleado('')
+    setAutorizacion(null)
     setSinDestellos(false)
     setResultadoRegistro(null)
     setRegErr('')
@@ -564,7 +593,16 @@ export default function RRHH() {
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nombre completo</label>
-                  <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} onKeyDown={e => e.key === 'Enter' && iniciarEscaneo()} />
+                  <input style={inputStyle} type="text" placeholder="Ej: Juan Pérez" value={nombre} onChange={e => setNombre(e.target.value)} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Correo de la persona</label>
+                  <input style={inputStyle} type="email" placeholder="Ej: juan@correo.com" value={correoEmpleado} onChange={e => setCorreoEmpleado(e.target.value)} onKeyDown={e => e.key === 'Enter' && iniciarEscaneo()} />
+                  <div style={{ fontSize: 11.5, color: '#888', marginTop: 5, lineHeight: 1.5 }}>
+                    Ahí le llega la constancia de lo que autorizó y los datos para
+                    revocarla. Usa un correo personal: el filtro de la universidad
+                    bloquea estos mensajes.
+                  </div>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16, padding: 12, background: '#fffaf0', borderRadius: 12, border: '1px solid #f0c070', cursor: 'pointer' }}>
                   <input
@@ -578,13 +616,22 @@ export default function RRHH() {
                     los destellos de color del escaneo. Pregúntelo antes de empezar.
                   </span>
                 </label>
-                <button style={btnPrimary} onClick={iniciarEscaneo} disabled={!identificacion.trim() || !nombre.trim()}>
-                  Iniciar escaneo facial
+                <button style={btnPrimary} onClick={iniciarEscaneo} disabled={!identificacion.trim() || !nombre.trim() || !correoEmpleado.trim()}>
+                  Continuar
                 </button>
               </>
             )}
 
-            {/* PASO 2 — escaneo en vivo */}
+            {/* PASO 2 — autorización de datos biométricos */}
+            {pasoRegistro === 'consentimiento' && (
+              <ConsentimientoDatos
+                nombre={nombre.trim()}
+                onAutoriza={autorizaDatos}
+                onRechaza={rechazaDatos}
+              />
+            )}
+
+            {/* PASO 3 — escaneo en vivo */}
             {pasoRegistro === 'escaneo' && (
               <>
                 <div style={{ marginBottom: 12, padding: 12, background: '#f7f7f7', borderRadius: 12, fontSize: 12, color: '#444' }}>
@@ -596,6 +643,8 @@ export default function RRHH() {
                   proposito="registro"
                   identificacion={identificacion.trim()}
                   nombre={nombre.trim()}
+                  correo={correoEmpleado.trim()}
+                  autorizacion={autorizacion}
                   sinDestellos={sinDestellos}
                   onExito={registroExitoso}
                   onFallo={registroFallido}

@@ -49,6 +49,17 @@ resource "aws_lambda_function" "liveness" {
       # La entrada prioriza rapidez: solo el óvalo, unos 3 segundos menos.
       DESAFIO_REGISTRO   = "FaceMovementAndLightChallenge"
       DESAFIO_VALIDACION = "FaceMovementChallenge"
+
+      # Ley 1581: versión de la política que se muestra al registrarse y
+      # que queda guardada con cada autorización. Al cambiar el texto hay
+      # que subir este número, o las constancias dirán que la gente
+      # aceptó algo que ya no existe.
+      POLITICA_VERSION  = "2026-10-v1"
+      CANAL_HABEAS_DATA = "biosecurityucompensar@gmail.com"
+
+      # Para la constancia que se le envía a la persona registrada.
+      SMTP_USUARIO = var.smtp_usuario
+      SMTP_CLAVE   = var.smtp_clave
     }
   }
 

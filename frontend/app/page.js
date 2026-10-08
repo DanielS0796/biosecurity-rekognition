@@ -128,6 +128,16 @@ export default function Home() {
                 </button>
               </div>
             )}
+
+            {/* Deber de información de la Ley 1581: la persona tiene que
+                poder ver, en el momento en que le escanean la cara, qué
+                se está tratando y cómo salirse. El consentimiento se dio
+                una vez al registrarse; esto no lo repite, lo recuerda. */}
+            <div style={{ width: '100%', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(0,0,0,0.08)', fontSize: 11, color: '#777', lineHeight: 1.6, textAlign: 'center' }}>
+              Tus datos biométricos se tratan según la política que autorizaste al
+              registrarte. Para consultarla o revocar tu autorización, escribe a
+              biosecurityucompensar@gmail.com
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 require('./preparar.js');
 const rek = require('@aws-sdk/client-rekognition');
 const dyn = require('@aws-sdk/client-dynamodb');
+const mail = require('nodemailer');
 process.env.BUCKET_AUDITORIA = '';
 const { handler } = require('./liveness.actual.js');
 
@@ -12,7 +13,15 @@ function check(nombre, cond, detalle='') {
   if (cond) { console.log(`  ✓ ${nombre}`); pasaron++; }
   else { console.log(`  ✗ ${nombre} ${detalle}`); fallaron++; }
 }
-const reset = () => { rek.__estado.respuestas = {}; rek.__estado.llamadas = []; dyn.__estado.llamadas = []; };
+const reset = () => { rek.__estado.respuestas = {}; rek.__estado.llamadas = []; dyn.__estado.llamadas = []; mail.__enviados.length = 0; };
+
+// Lo que el navegador manda al registrar, ya con el consentimiento dado.
+// El Lambda comprueba la versión contra la suya: si no coinciden, la
+// persona aceptó un texto que ya no rige.
+const AUTORIZA = {
+  correo: 'persona@correo.test',
+  autorizacion: { autorizado: true, politica_version: '2026-10-v1', canal: 'app-web' },
+};
 
 (async () => {
 console.log('\n── 1. Una foto no puede pasar: Rekognition reporta FAILED ──');
@@ -71,7 +80,7 @@ check('rechaza con 401', r.status === 401, `-> ${r.status}`);
 console.log('\n── 6. Registro: indexa la imagen de AWS ──');
 reset();
 rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-reg' };
-r = await post('/liveness-init', { proposito: 'registro', identificacion: '999', nombre: 'Luis Díaz' });
+r = await post('/liveness-init', { proposito: 'registro', identificacion: '999', nombre: 'Luis Díaz' , ...AUTORIZA });
 check('crea la sesión', r.body.session_id === 's-reg', JSON.stringify(r.body));
 const imgReg = Buffer.from('REFERENCIA-REGISTRO');
 rek.__estado.respuestas.GetFaceLivenessSessionResultsCommand = {
@@ -90,14 +99,14 @@ check('queda en DynamoDB con metodo_registro=liveness',
 
 console.log('\n── 7. Registro con cédula ya tomada ──');
 reset();
-r = await post('/liveness-init', { proposito: 'registro', identificacion: '999', nombre: 'Otro' });
+r = await post('/liveness-init', { proposito: 'registro', identificacion: '999', nombre: 'Otro' , ...AUTORIZA });
 check('falla antes de escanear', r.status === 400, `-> ${r.status}`);
 check('no pide sesión a Rekognition',
   !rek.__estado.llamadas.some(l => l.tipo === 'CreateFaceLivenessSessionCommand'));
 
 console.log('\n── 8. Registro sin datos ──');
 reset();
-r = await post('/liveness-init', { proposito: 'registro' });
+r = await post('/liveness-init', { proposito: 'registro' , ...AUTORIZA });
 check('exige identificación y nombre', r.status === 400, `-> ${r.status}`);
 
 console.log('\n── 9. Persona viva pero no registrada ──');
@@ -132,7 +141,7 @@ rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
   pedido = input?.Settings?.ChallengePreferences?.[0]?.Type;
   return { SessionId: 's-desafio2' };
 };
-await post('/liveness-init', { proposito: 'registro', identificacion: '777', nombre: 'Marta Ruiz' });
+await post('/liveness-init', { proposito: 'registro', identificacion: '777', nombre: 'Marta Ruiz' , ...AUTORIZA });
 check('el registro pide el desafío con destellos',
   pedido === 'FaceMovementAndLightChallenge', `-> ${pedido}`);
 
@@ -169,7 +178,7 @@ rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
   return { SessionId: 's-fotosensible' };
 };
 r = await post('/liveness-init', {
-  proposito: 'registro', identificacion: '555', nombre: 'Sofía Rojas', sin_destellos: true });
+  proposito: 'registro', identificacion: '555', nombre: 'Sofía Rojas', sin_destellos: true, ...AUTORIZA });
 check('el registro omite los destellos cuando se pide',
   tipo === 'FaceMovementChallenge', `-> ${tipo}`);
 check('informa el desafío usado', r.body.desafio === 'FaceMovementChallenge', JSON.stringify(r.body));
@@ -182,9 +191,71 @@ rek.__estado.respuestas.CreateFaceLivenessSessionCommand = (input) => {
   tipo = input?.Settings?.ChallengePreferences?.[0]?.Type;
   return { SessionId: 's-normal' };
 };
-await post('/liveness-init', { proposito: 'registro', identificacion: '556', nombre: 'Iván Peña' });
+await post('/liveness-init', { proposito: 'registro', identificacion: '556', nombre: 'Iván Peña' , ...AUTORIZA });
 check('sin la bandera, el registro mantiene los destellos',
   tipo === 'FaceMovementAndLightChallenge', `-> ${tipo}`);
+
+console.log('\n── Ley 1581: la autorización no se puede saltar ──');
+reset();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-ley' };
+
+r = await post('/liveness-init', { proposito: 'registro', identificacion: '800', nombre: 'Ana Gil', correo: 'a@x.test' });
+check('sin autorización no abre sesión', r.status === 400, JSON.stringify(r.body));
+check('no llama a Rekognition',
+  !rek.__estado.llamadas.some(l => l.tipo === 'CreateFaceLivenessSessionCommand'));
+
+r = await post('/liveness-init', {
+  proposito: 'registro', identificacion: '800', nombre: 'Ana Gil', correo: 'a@x.test',
+  autorizacion: { autorizado: false, politica_version: '2026-10-v1' } });
+check('autorizado:false tampoco pasa', r.status === 400, JSON.stringify(r.body));
+
+r = await post('/liveness-init', {
+  proposito: 'registro', identificacion: '800', nombre: 'Ana Gil', correo: 'a@x.test',
+  autorizacion: { autorizado: true, politica_version: '2019-vieja' } });
+check('una versión vieja de la política se rechaza', r.status === 409, JSON.stringify(r.body));
+
+r = await post('/liveness-init', {
+  proposito: 'registro', identificacion: '800', nombre: 'Ana Gil',
+  autorizacion: { autorizado: true, politica_version: '2026-10-v1' } });
+check('sin correo no hay dónde mandar la constancia', r.status === 400, JSON.stringify(r.body));
+
+// La validación diaria no pide autorización: se dio una vez al registrarse.
+r = await post('/liveness-init', { proposito: 'validacion' });
+check('validar no exige autorización', r.body.codigo === 0, JSON.stringify(r.body));
+
+console.log('\n── Ley 1581: la constancia queda guardada y se envía ──');
+reset();
+process.env.SMTP_USUARIO = 'buzon@prueba.test';
+process.env.SMTP_CLAVE = 'clave-doble';
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-const' };
+r = await post('/liveness-init', { proposito: 'registro', identificacion: '801', nombre: 'Ana Gil', ...AUTORIZA });
+check('con autorización sí abre sesión', r.body.codigo === 0, JSON.stringify(r.body));
+
+const sesion = dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-const'];
+check('la sesión guarda que autorizó', sesion?.autorizacion_datos?.BOOL === true);
+check('guarda la versión de la política', sesion?.politica_version?.S === '2026-10-v1',
+  sesion?.politica_version?.S);
+check('guarda el canal', sesion?.autorizacion_canal?.S === 'app-web');
+check('la fecha la pone el servidor, no el navegador',
+  !!sesion?.autorizacion_fecha?.S && !isNaN(Date.parse(sesion.autorizacion_fecha.S)));
+
+rek.__estado.respuestas.GetFaceLivenessSessionResultsCommand = {
+  Status: 'SUCCEEDED', Confidence: 95, ReferenceImage: { Bytes: Buffer.from('cara') } };
+rek.__estado.respuestas.IndexFacesCommand = { FaceRecords: [{ Face: { FaceId: 'f-801' } }] };
+r = await post('/liveness-result', { session_id: 's-const' });
+check('el registro se completa', r.body.codigo === 0, JSON.stringify(r.body));
+
+const empleado = dyn.__estado.tablas['biosecurity-empleados']?.['801'];
+check('el empleado hereda la constancia', empleado?.autorizacion_datos?.BOOL === true,
+  JSON.stringify(empleado));
+check('con la misma versión', empleado?.politica_version?.S === '2026-10-v1');
+check('y el correo', empleado?.correo?.S === 'persona@correo.test');
+
+check('se envió la constancia', mail.__enviados.length === 1, String(mail.__enviados.length));
+const texto = mail.__enviados[0]?.text || '';
+check('dice a dónde revocar', /biosecurityucompensar@gmail\.com/.test(texto));
+check('explica que no se guarda la foto', /no la\s+fotograf/i.test(texto), texto.slice(0, 200));
+check('menciona la ley', /Ley 1581/.test(texto));
 
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);

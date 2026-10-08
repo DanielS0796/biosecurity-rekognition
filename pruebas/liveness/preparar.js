@@ -8,6 +8,7 @@ const path = require('path');
 const pares = [
   ['rekognition.js', '@aws-sdk/client-rekognition'],
   ['dynamodb.js', '@aws-sdk/client-dynamodb'],
+  ['nodemailer.js', 'nodemailer'],
 ];
 
 for (const [origen, paquete] of pares) {

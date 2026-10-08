@@ -39,6 +39,8 @@ import {
  *   proposito      "registro" | "validacion"
  *   identificacion cédula (obligatoria para registro)
  *   nombre         nombre del empleado (obligatorio para registro)
+ *   correo         a dónde se envía la constancia (obligatorio para registro)
+ *   autorizacion   { autorizado, politica_version, canal } (obligatoria para registro)
  *   sinDestellos   omite la secuencia de luces (vía para fotosensibles)
  *   onExito        (datos) => void   resultado del backend
  *   onFallo        (mensaje) => void
@@ -135,6 +137,11 @@ export default function LivenessScan({
   proposito = 'validacion',
   identificacion = '',
   nombre = '',
+  correo = '',
+  // Constancia de la autorización que la persona dio antes de llegar
+  // acá. El servidor la verifica y la guarda; el navegador solo la
+  // transporta.
+  autorizacion = null,
   sinDestellos = false,
   onExito,
   onFallo,
@@ -189,7 +196,10 @@ export default function LivenessScan({
         const r = await fetch(API_LIVENESS_INIT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ proposito, identificacion, nombre, sin_destellos: sinDestellos }),
+          body: JSON.stringify({
+            proposito, identificacion, nombre, correo,
+            autorizacion, sin_destellos: sinDestellos,
+          }),
         })
         const data = await r.json()
 
@@ -205,7 +215,13 @@ export default function LivenessScan({
       }
       setCargando(false)
     })()
-  }, [proposito, identificacion, nombre, sinDestellos])
+    // Las dependencias son los campos de la autorización, no el objeto:
+    // si el padre lo construye en línea, la identidad cambia en cada
+    // render y el efecto se reiniciaría sin fin, abriendo una sesión de
+    // Rekognition cada vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposito, identificacion, nombre, correo, sinDestellos,
+      autorizacion?.autorizado, autorizacion?.politica_version])
 
   // Rekognition terminó de analizar el video. Le pedimos el veredicto al
   // backend, que es el único que puede consultarlo.

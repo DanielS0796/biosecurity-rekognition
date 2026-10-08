@@ -51,6 +51,15 @@ const TABLE_ACCESOS = process.env.TABLE_ACCESOS || "biosecurity-accesos";
 const COLLECTION_ID = process.env.COLLECTION_ID || "coleccion2anlusoft";
 const BUCKET_AUDITORIA = process.env.BUCKET_AUDITORIA || "";
 
+// Versión de la política de tratamiento de datos que se le muestra a la
+// persona al registrarse. Se guarda junto con la autorización: si mañana
+// cambia el texto, queda constancia de cuál aceptó cada quien, que es lo
+// que pide la Ley 1581 cuando dice "informada".
+const POLITICA_VERSION = process.env.POLITICA_VERSION || "2026-10-v1";
+
+// Buzón al que la persona escribe para consultar, actualizar o revocar.
+const CANAL_HABEAS_DATA = process.env.CANAL_HABEAS_DATA || "biosecurityucompensar@gmail.com";
+
 // Confianza mínima de liveness (0-100). Es el score que dice si había una
 // persona real frente a la cámara. 85 es el punto de equilibrio que recomienda
 // AWS; subirlo endurece el control a costa de más reintentos legítimos.
@@ -116,11 +125,42 @@ async function iniciarLiveness(event) {
     // los destellos pueden desencadenar crisis en epilepsia fotosensible.
     const sinDestellos = body.sin_destellos === true;
 
+    const correo = (body.correo || "").trim();
+    const autorizacion = body.autorizacion || {};
+
     if (proposito === "registro") {
         if (!identificacion || !nombre) {
             return responder(400, {
                 codigo: 1,
                 descripcion: "Para registrar se necesitan identificación y nombre",
+            });
+        }
+
+        // Los datos biométricos son sensibles (Ley 1581, art. 5), así que
+        // el tratamiento exige autorización previa, expresa e informada.
+        // Se comprueba acá, antes de encender la cámara: capturar primero
+        // y preguntar después sería tratar el dato sin permiso.
+        if (autorizacion.autorizado !== true) {
+            return responder(400, {
+                codigo: 1,
+                descripcion: "Falta la autorización para el tratamiento de datos biométricos",
+            });
+        }
+
+        // Si el navegador mostró una versión distinta de la que rige, la
+        // persona aceptó un texto que ya no es el vigente. Guardar eso
+        // como constancia sería guardar una constancia falsa.
+        if (autorizacion.politica_version !== POLITICA_VERSION) {
+            return responder(409, {
+                codigo: 1,
+                descripcion: "La política de tratamiento de datos cambió. Recarga la página y vuelve a leerla.",
+            });
+        }
+
+        if (!correo) {
+            return responder(400, {
+                codigo: 1,
+                descripcion: "Se necesita un correo para enviar la constancia de la autorización",
             });
         }
 
@@ -157,6 +197,13 @@ async function iniciarLiveness(event) {
             desafio: { S: desafio },
             created_at: { N: String(ahora) },
             expires_at: { N: String(ahora + 600) },
+            // Constancia de la autorización. La fecha la pone el
+            // servidor: una que mande el navegador no prueba nada.
+            correo: { S: correo || "-" },
+            autorizacion_datos: { BOOL: proposito === "registro" },
+            autorizacion_fecha: { S: new Date().toISOString() },
+            politica_version: { S: proposito === "registro" ? POLITICA_VERSION : "-" },
+            autorizacion_canal: { S: (autorizacion.canal || "app-web").slice(0, 40) },
         },
     }));
 
@@ -215,6 +262,13 @@ async function procesarResultado(event) {
     const proposito = sesion.Item.proposito?.S || "validacion";
     const identificacionSesion = sesion.Item.identificacion?.S || "";
     const nombreSesion = sesion.Item.nombre?.S || "";
+    // La constancia se fijó al crear la sesión, con la hora del servidor.
+    const evidencia = {
+        correo: sesion.Item.correo?.S || "",
+        autorizacionFecha: sesion.Item.autorizacion_fecha?.S || "",
+        politicaVersion: sesion.Item.politica_version?.S || "",
+        autorizacionCanal: sesion.Item.autorizacion_canal?.S || "app-web",
+    };
 
     // Anti-replay: solo una transición pendiente -> procesando puede ganar.
     // Si dos peticiones llegan con el mismo session_id, la segunda falla aquí.
@@ -306,6 +360,7 @@ async function procesarResultado(event) {
             nombre: nombreSesion,
             imagen,
             confianza,
+            ...evidencia,
         });
     }
 
@@ -315,7 +370,10 @@ async function procesarResultado(event) {
 /* ────────────────────────────────────────────────────────────
  * Registro: indexa la ReferenceImage de AWS, nunca una foto del cliente
  * ──────────────────────────────────────────────────────────── */
-async function registrarEmpleado({ sessionId, identificacion, nombre, imagen, confianza }) {
+async function registrarEmpleado({
+    sessionId, identificacion, nombre, imagen, confianza,
+    correo, autorizacionFecha, politicaVersion, autorizacionCanal,
+}) {
     // Revalida la cédula: pudo registrarse alguien más mientras duraba el escaneo.
     const existente = await dynamo.send(new GetItemCommand({
         TableName: TABLE_EMPLEADOS,
@@ -405,8 +463,28 @@ async function registrarEmpleado({ sessionId, identificacion, nombre, imagen, co
             metodo_registro: { S: "liveness" },
             liveness_session_id: { S: sessionId },
             liveness_confianza: { N: confianza.toFixed(2) },
+            // La constancia viaja con la sesión hasta acá, para que el
+            // registro del empleado se baste a sí mismo: quien audite no
+            // tiene que cruzar dos tablas para saber si hubo permiso.
+            correo: { S: correo },
+            autorizacion_datos: { BOOL: true },
+            autorizacion_fecha: { S: autorizacionFecha },
+            politica_version: { S: politicaVersion },
+            autorizacion_canal: { S: autorizacionCanal },
         },
     }));
+
+    if (correo && correo !== "-") {
+        try {
+            await enviarConstancia(correo, nombre, identificacion, autorizacionFecha, politicaVersion);
+        } catch (e) {
+            // El registro ya está hecho y es válido: la constancia es una
+            // cortesía, no el consentimiento. No se revierte por esto.
+            log("WARN", "No se pudo enviar la constancia de autorización", {
+                identificacion, error: e.message,
+            });
+        }
+    }
 
     await marcarSesion(sessionId, "consumida");
 
@@ -590,6 +668,99 @@ async function marcarSesion(sessionId, estado) {
 
 // La evidencia en S3 es deseable pero no indispensable: si el cliente de S3
 // no estuviera disponible en el runtime, el escaneo debe seguir funcionando.
+/* ────────────────────────────────────────────────────────────
+ * Constancia de la autorización (Ley 1581 de 2012)
+ * ──────────────────────────────────────────────────────────── */
+
+/**
+ * Le manda a la persona registrada una constancia de lo que autorizó.
+ *
+ * No es el consentimiento —ese se dio en la pantalla, antes de encender
+ * la cámara— sino la prueba que ella conserva: qué se guardó, con qué
+ * finalidad, por cuánto tiempo y a dónde escribir para salirse. La ley
+ * le da derecho a conocer y revocar en cualquier momento, y un derecho
+ * que la persona no sabe que tiene no se ejerce.
+ */
+async function enviarConstancia(correo, nombre, identificacion, fecha, version) {
+    if (!process.env.SMTP_USUARIO || !process.env.SMTP_CLAVE) {
+        log("WARN", "SMTP sin configurar, no se envía la constancia", { identificacion });
+        return;
+    }
+
+    const nodemailer = require("nodemailer");
+    const transporte = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: process.env.SMTP_USUARIO, pass: process.env.SMTP_CLAVE },
+    });
+
+    const fechaLegible = new Date(fecha).toLocaleString("es-CO", {
+        timeZone: "America/Bogota", dateStyle: "long", timeStyle: "short",
+    });
+
+    const texto = [
+        `Constancia de autorización de tratamiento de datos biométricos`,
+        ``,
+        `Nombre: ${nombre}`,
+        `Identificación: ${identificacion}`,
+        `Fecha de la autorización: ${fechaLegible}`,
+        `Versión de la política aceptada: ${version}`,
+        `Canal: aplicación web de control de acceso`,
+        ``,
+        `Qué se guardó: un vector matemático derivado de tu rostro, no la`,
+        `fotografía. Ese vector no permite reconstruir tu cara.`,
+        ``,
+        `Para qué: verificar tu identidad al entrar a las instalaciones.`,
+        `No se usa para ninguna otra finalidad.`,
+        ``,
+        `Por cuánto tiempo: mientras mantengas tu vínculo con la`,
+        `institución. Al terminar, el registro pasa a retirados y el vector`,
+        `se elimina de la colección biométrica.`,
+        ``,
+        `Tus derechos: puedes conocer, actualizar, rectificar y revocar`,
+        `esta autorización cuando quieras, sin dar explicaciones,`,
+        `escribiendo a ${CANAL_HABEAS_DATA}.`,
+        ``,
+        `Si revocas, se elimina el dato biométrico y el ingreso pasa a`,
+        `hacerse presentando documento.`,
+        ``,
+        `Ley 1581 de 2012 y Decreto 1377 de 2013.`,
+    ].join("\n");
+
+    const escapar = (t) => String(t)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const html = `
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px">
+  <div style="background:#4B2D8F;padding:20px;border-radius:12px 12px 0 0;text-align:center">
+    <h2 style="color:white;margin:0;font-size:18px">Constancia de autorización</h2>
+  </div>
+  <div style="background:#f9f9f9;padding:24px;border-radius:0 0 12px 12px;border:1px solid #eee;color:#333;line-height:1.6">
+    <p>Quedó registrada tu autorización para el tratamiento de datos biométricos en el sistema de control de acceso.</p>
+    <table style="width:100%;font-size:14px;border-collapse:collapse;margin:16px 0">
+      <tr><td style="padding:4px 0;color:#666">Nombre</td><td style="padding:4px 0"><strong>${escapar(nombre)}</strong></td></tr>
+      <tr><td style="padding:4px 0;color:#666">Identificación</td><td style="padding:4px 0"><strong>${escapar(identificacion)}</strong></td></tr>
+      <tr><td style="padding:4px 0;color:#666">Fecha</td><td style="padding:4px 0">${escapar(fechaLegible)}</td></tr>
+      <tr><td style="padding:4px 0;color:#666">Política</td><td style="padding:4px 0">versión ${escapar(version)}</td></tr>
+    </table>
+    <p style="font-size:14px"><strong>Qué se guardó.</strong> Un vector matemático derivado de tu rostro, no la fotografía. Ese vector no permite reconstruir tu cara.</p>
+    <p style="font-size:14px"><strong>Para qué.</strong> Verificar tu identidad al entrar a las instalaciones. Ninguna otra finalidad.</p>
+    <p style="font-size:14px"><strong>Por cuánto tiempo.</strong> Mientras mantengas tu vínculo con la institución. Al terminar, el vector se elimina de la colección biométrica.</p>
+    <p style="font-size:14px"><strong>Tus derechos.</strong> Puedes conocer, actualizar, rectificar y revocar esta autorización cuando quieras, sin dar explicaciones, escribiendo a <a href="mailto:${CANAL_HABEAS_DATA}">${CANAL_HABEAS_DATA}</a>. Si revocas, se elimina el dato biométrico y el ingreso pasa a hacerse presentando documento.</p>
+    <p style="font-size:12px;color:#888;margin-top:20px">Ley 1581 de 2012 y Decreto 1377 de 2013.</p>
+  </div>
+</div>`;
+
+    await transporte.sendMail({
+        from: `"Biosecurity UCompensar" <${process.env.SMTP_USUARIO}>`,
+        to: correo,
+        subject: "Constancia de autorización de datos biométricos",
+        text: texto,
+        html,
+    });
+
+    log("INFO", "Constancia de autorización enviada", { identificacion, version });
+}
+
 async function guardarEvidencia(sessionId, proposito, imagen) {
     if (!BUCKET_AUDITORIA) return;
     try {
