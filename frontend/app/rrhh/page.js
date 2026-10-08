@@ -695,24 +695,17 @@ export default function RRHH() {
             <button style={btnPrimary} onClick={crearUsuario} disabled={crearLoading}>{crearLoading ? '⏳ Creando...' : 'Crear usuario'}</button>
 
             {avisoEnvio && (
-              <div style={{ marginTop: 14, padding: 16, background: '#f1f8f2', borderRadius: 12, border: '2px solid #2e7d32' }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#1b5e20', marginBottom: 8 }}>
-                  Usuario {avisoEnvio.usuario} creado
-                </div>
-                <div style={{ fontSize: 12.5, color: '#2c5530', lineHeight: 1.6 }}>
-                  La contraseña temporal se envió a <strong>{avisoEnvio.correo}</strong>.
-                  Vence en {avisoEnvio.horas} horas y solo sirve para que esa
-                  persona elija su propia contraseña.
-                </div>
-                <div style={{ fontSize: 12, color: '#55705a', marginTop: 8, lineHeight: 1.5 }}>
-                  Nadie más la conoce, tú incluido. Si el correo no llega o se
-                  vence, esa persona puede usar "¿Olvidaste tu contraseña?" en
-                  la pantalla de ingreso.
+              <div style={{ marginTop: 14, padding: 14, background: '#f1f8f2', borderRadius: 12, border: '2px solid #2e7d32', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ fontSize: 15, lineHeight: 1.4 }}>✓</div>
+                <div style={{ flex: 1, fontSize: 13, color: '#1b5e20', lineHeight: 1.5 }}>
+                  Usuario <strong>{avisoEnvio.usuario}</strong> creado. Su contraseña de
+                  un solo uso fue enviada al correo registrado.
                 </div>
                 <button
                   onClick={() => setAvisoEnvio(null)}
-                  style={{ width: '100%', marginTop: 12, padding: 9, border: 'none', borderRadius: 8, background: '#2e7d32', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                  Entendido
+                  aria-label="Cerrar aviso"
+                  style={{ border: 'none', background: 'transparent', color: '#2e7d32', fontSize: 16, fontWeight: 800, cursor: 'pointer', lineHeight: 1, padding: 2 }}>
+                  ×
                 </button>
               </div>
             )}
