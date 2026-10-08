@@ -171,6 +171,8 @@ terraform apply -auto-approve \
   -target=aws_lambda_function.validacion_biometrica \
   -target=aws_lambda_function.liveness \
   -target=aws_iam_role_policy.lambda_liveness_policy \
+  -target=aws_iam_role_policy.lambda_reset_policy \
+  -target=aws_iam_role_policy.lambda_dynamo_policy \
   -target=aws_api_gateway_rest_api.api_liveness \
   -target=aws_api_gateway_resource.liveness \
   -target=aws_api_gateway_method.liveness_post \

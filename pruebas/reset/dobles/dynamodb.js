@@ -20,10 +20,24 @@ class DynamoDBClient {
     if (cmd.tipo === 'UpdateItemCommand') {
       const k = cmd.input.Key.email.S;
       const item = t[k] || { email: { S: k } };
-      // Interpreta "SET a = :x, b = :y" con los valores dados
+      // Interpreta "SET a = :x, #b = :y" con los valores dados.
+      // Los alias #nombre se resuelven por ExpressionAttributeNames igual
+      // que en DynamoDB, y un alias sin declarar revienta acá, que es lo
+      // que hace el servicio de verdad.
+      const nombres = cmd.input.ExpressionAttributeNames || {};
       const expr = cmd.input.UpdateExpression.replace(/^SET\s+/i, '');
       for (const parte of expr.split(',')) {
-        const [campo, ph] = parte.split('=').map(s => s.trim());
+        const [crudo, ph] = parte.split('=').map(s => s.trim());
+        let campo = crudo;
+        if (crudo.startsWith('#')) {
+          if (!(crudo in nombres)) {
+            throw Object.assign(
+              new Error(`ExpressionAttributeNames no declara ${crudo}`),
+              { name: 'ValidationException' }
+            );
+          }
+          campo = nombres[crudo];
+        }
         item[campo] = cmd.input.ExpressionAttributeValues[ph];
       }
       t[k] = item;

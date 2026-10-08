@@ -189,7 +189,11 @@ async function guardarClave(email, clave, { debeCambiar = false } = {}) {
         Key: { email: { S: email } },
         // UpdateItem y no PutItem: el PutItem anterior reemplazaba el registro
         // entero y se llevaba por delante el rol y la fecha de creación.
-        UpdateExpression: "SET password = :p, debe_cambiar_clave = :d, updated_at = :u",
+        // password va con alias: DynamoDB rechaza la expresión si el nombre
+        // del atributo cae en su lista de palabras reservadas, y no vale la
+        // pena depender de que no esté.
+        UpdateExpression: "SET #password = :p, debe_cambiar_clave = :d, updated_at = :u",
+        ExpressionAttributeNames: { "#password": "password" },
         ExpressionAttributeValues: {
             ":p": { S: hashear(clave) },
             ":d": { BOOL: debeCambiar },
@@ -490,7 +494,8 @@ async function revisarCodigo(email, codigo) {
         await dynamo.send(new UpdateItemCommand({
             TableName: TABLA_CODIGOS,
             Key: { email: { S: email } },
-            UpdateExpression: "SET intentos = :i",
+            UpdateExpression: "SET #intentos = :i",
+            ExpressionAttributeNames: { "#intentos": "intentos" },
             ExpressionAttributeValues: { ":i": { N: String(intentos + 1) } },
         }));
         return { ok: false, respuesta: error(400, `Código incorrecto. Te quedan ${quedan} intentos.`) };
@@ -576,7 +581,15 @@ exports.handler = Sentry.wrapHandler(async (event) => {
         return await manejar(body);
 
     } catch (err) {
-        log("ERROR", "Error en Lambda reset", { error: err.message });
+        // El nombre del error importa tanto como el mensaje: un
+        // AccessDeniedException se ve igual que cualquier otro fallo si
+        // solo se registra err.message, y se pierde media hora buscando
+        // en el código lo que era un permiso de IAM.
+        log("ERROR", "Error en Lambda reset", {
+            error: err.message,
+            tipo: err.name,
+            http: err.$metadata?.httpStatusCode,
+        });
         Sentry.captureException(err);
         return error(500, "Error interno");
     }

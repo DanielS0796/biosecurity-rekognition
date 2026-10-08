@@ -748,6 +748,10 @@ resource "aws_iam_role_policy" "lambda_reset_policy" {
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
+          # UpdateItem: guardarClave() y el contador de intentos del código
+          # de reset escriben con UpdateItem, no con PutItem, para no
+          # reemplazar el registro entero y perder el rol y created_at.
+          "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
           "dynamodb:Scan"
         ]
