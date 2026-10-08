@@ -168,6 +168,11 @@ resource "aws_iam_role_policy" "lambda_kms_policy" {
 resource "aws_rekognition_collection" "coleccion" {
   collection_id = "coleccion2anlusoft"
   tags          = { Project = "anlusoft-rekognition" }
+  # Un plan que quiera recrear esto borraría datos irrecuperables. Así
+  # Terraform falla en vez de destruirlo: el error se revisa a mano.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # ─────────────────────────────────────────
@@ -182,6 +187,11 @@ resource "aws_dynamodb_table" "empleados" {
     type = "S"
   }
   tags = { Project = "anlusoft-rekognition" }
+  # Un plan que quiera recrear esto borraría datos irrecuperables. Así
+  # Terraform falla en vez de destruirlo: el error se revisa a mano.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_dynamodb_table" "retirados" {
@@ -193,6 +203,11 @@ resource "aws_dynamodb_table" "retirados" {
     type = "S"
   }
   tags = { Project = "anlusoft-rekognition" }
+  # Un plan que quiera recrear esto borraría datos irrecuperables. Así
+  # Terraform falla en vez de destruirlo: el error se revisa a mano.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_dynamodb_table" "accesos" {
@@ -228,6 +243,11 @@ resource "aws_dynamodb_table" "accesos" {
   }
 
   tags = { Project = "anlusoft-rekognition" }
+  # Un plan que quiera recrear esto borraría datos irrecuperables. Así
+  # Terraform falla en vez de destruirlo: el error se revisa a mano.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # ─────────────────────────────────────────
@@ -684,6 +704,11 @@ resource "aws_dynamodb_table" "usuarios" {
     type = "S"
   }
   tags = { Project = "anlusoft-rekognition" }
+  # Un plan que quiera recrear esto borraría datos irrecuperables. Así
+  # Terraform falla en vez de destruirlo: el error se revisa a mano.
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # ─────────────────────────────────────────
