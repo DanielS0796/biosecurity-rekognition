@@ -25,8 +25,15 @@ este archivo.
 ## Mantenimiento
 
 `COBERTURA`, en el encabezado del script, dice qué política cubre a qué
-Lambda. Un Lambda nuevo que use DynamoDB y no esté en esa lista se
-reporta como hueco, así que la lista no se desactualiza en silencio.
+Lambda, por nombre del recurso de Terraform. Un Lambda nuevo que use
+DynamoDB y no esté en esa lista se reporta como hueco, así que la lista
+no se desactualiza en silencio.
+
+La lista de Lambdas sale de los `resource "aws_lambda_function"` de los
+.tf, no de listar `lambda/`. Esa carpeta puede tener archivos sueltos
+que no son el handler de nadie: se empaquetan de más pero no corren, y
+bloquear un despliegue por ellos sería ruido. Igual se avisan al final,
+porque conviene saber que van dentro de cada zip.
 
 Compara acciones, no ARNs: una política que conceda `UpdateItem` sobre
 la tabla equivocada pasaría en verde.

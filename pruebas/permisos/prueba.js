@@ -33,15 +33,38 @@ const ACCION = {
     TransactWriteItemsCommand: "dynamodb:TransactWriteItems",
 };
 
-// Qué política cubre a qué Lambda. Si se agrega un Lambda nuevo que toque
-// DynamoDB, va acá: una entrada que falte se reporta como hueco.
-const COBERTURA = [
-    { codigo: "lambda/reset.js", politica: "lambda_reset_policy", archivo: "main.tf" },
-    { codigo: "lambda/liveness.js", politica: "lambda_liveness_policy", archivo: "liveness-iam.tf" },
-    { codigo: "lambda/auditoria.js", politica: "lambda_dynamo_policy", archivo: "main.tf" },
-    { codigo: "lambda/index.js", politica: "lambda_dynamo_policy", archivo: "main.tf" },
-    { codigo: "lambda/registrar.js", politica: "lambda_dynamo_policy", archivo: "main.tf" },
-];
+// Qué política cubre a qué Lambda, por nombre del recurso de Terraform.
+// Un Lambda nuevo que toque DynamoDB y no esté acá se reporta como hueco.
+const COBERTURA = {
+    reset: { politica: "lambda_reset_policy", archivo: "main.tf" },
+    liveness: { politica: "lambda_liveness_policy", archivo: "liveness-iam.tf" },
+    auditoria: { politica: "lambda_dynamo_policy", archivo: "main.tf" },
+    validacion_biometrica: { politica: "lambda_dynamo_policy", archivo: "main.tf" },
+    registrar_empleado: { politica: "lambda_dynamo_policy", archivo: "main.tf" },
+};
+
+const TF = ["main.tf", "liveness-api.tf"];
+
+/**
+ * Lambdas declarados en Terraform y el archivo que ejecuta cada uno.
+ * Se parte de acá y no del listado de lambda/, porque esa carpeta puede
+ * tener archivos sueltos que no son el handler de nadie: se empaquetan
+ * de más, pero no corren, y bloquear el despliegue por ellos sería
+ * ruido.
+ */
+function lambdasDeclarados() {
+    const lista = [];
+    for (const archivo of TF) {
+        const ruta = path.join(RAIZ, archivo);
+        if (!fs.existsSync(ruta)) continue;
+        const texto = fs.readFileSync(ruta, "utf8");
+        for (const m of texto.matchAll(/resource\s+"aws_lambda_function"\s+"([^"]+)"\s*\{([\s\S]*?)\n\}/g)) {
+            const handler = (m[2].match(/handler\s*=\s*"([^".]+)\./) || [])[1];
+            if (handler) lista.push({ recurso: m[1], codigo: `lambda/${handler}.js` });
+        }
+    }
+    return lista;
+}
 
 /** Comandos de DynamoDB que aparecen instanciados en un archivo. */
 function comandosUsados(ruta) {
@@ -85,20 +108,23 @@ function accionesConcedidas(archivo, politica) {
 let fallos = 0;
 console.log("\nPermisos de IAM frente al código\n" + "─".repeat(52));
 
-// Todo archivo de lambda/ que use DynamoDB tiene que estar en COBERTURA.
-const declarados = new Set(COBERTURA.map(c => c.codigo));
-for (const nombre of fs.readdirSync(path.join(RAIZ, "lambda")).filter(n => n.endsWith(".js"))) {
-    const ruta = `lambda/${nombre}`;
-    if (declarados.has(ruta)) continue;
-    if (comandosUsados(ruta).size > 0) {
-        console.log(`  ✗ ${ruta} usa DynamoDB y no está en COBERTURA`);
+for (const { recurso, codigo } of lambdasDeclarados()) {
+    if (!fs.existsSync(path.join(RAIZ, codigo))) {
+        console.log(`  ✗ ${recurso} apunta a ${codigo}, que no existe`);
         fallos++;
+        continue;
     }
-}
 
-for (const { codigo, politica, archivo } of COBERTURA) {
     const usados = comandosUsados(codigo);
     if (usados.size === 0) { console.log(`  · ${codigo} no usa DynamoDB`); continue; }
+
+    const cobertura = COBERTURA[recurso];
+    if (!cobertura) {
+        console.log(`  ✗ ${recurso} usa DynamoDB y no está en COBERTURA`);
+        fallos++;
+        continue;
+    }
+    const { politica, archivo } = cobertura;
 
     const concedidas = accionesConcedidas(archivo, politica);
     if (!concedidas) {
@@ -117,6 +143,16 @@ for (const { codigo, politica, archivo } of COBERTURA) {
     } else {
         console.log(`  ✓ ${codigo} — ${[...usados].map(c => ACCION[c].split(":")[1]).join(", ")}`);
     }
+}
+
+// Aviso, no fallo: archivos en lambda/ que no son el handler de nadie.
+// Viajan dentro de todos los zips porque se empaqueta la carpeta entera,
+// así que conviene saber que están, pero no corren y no bloquean nada.
+const handlers = new Set(lambdasDeclarados().map(l => path.basename(l.codigo)));
+const sueltos = fs.readdirSync(path.join(RAIZ, "lambda"))
+    .filter(n => n.endsWith(".js") && !handlers.has(n) && n !== "instrument.js");
+if (sueltos.length) {
+    console.log(`  ! sin usar, pero dentro de cada zip: ${sueltos.join(", ")}`);
 }
 
 console.log("─".repeat(52));
