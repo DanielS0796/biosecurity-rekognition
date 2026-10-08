@@ -5,8 +5,9 @@ node_modules/
 
 # Terraform
 .terraform/
-terraform.tfstate
-terraform.tfstate.backup
+# El estado lleva dentro las variables sensibles en claro. El comodín
+# cubre también los respaldos con fecha que deja migrar-estado.sh.
+terraform.tfstate*
 lambda_build/
 
 # Artefactos
