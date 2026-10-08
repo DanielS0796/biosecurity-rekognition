@@ -51,7 +51,6 @@ export default function RRHH() {
   // La temporal la genera el servidor y viaja solo por correo al usuario.
   // Acá no se guarda la contraseña, únicamente la confirmación del envío.
   const [avisoEnvio, setAvisoEnvio] = useState(null)
-  const [reenviando, setReenviando] = useState(null)
   const [crearOk, setCrearOk] = useState('')
   const [crearErr, setCrearErr] = useState('')
   const [crearLoading, setCrearLoading] = useState(false)
@@ -268,35 +267,6 @@ export default function RRHH() {
       alerta(setCrearErr, '⚠️ Error de conexión')
     }
     setCrearLoading(false)
-  }
-
-  async function reenviarTemporal(usuario) {
-    if (!confirm(
-      `Se le va a enviar una contraseña temporal nueva a ${usuario}.\n\n` +
-      'La anterior deja de funcionar de inmediato. ¿Continuar?'
-    )) return
-
-    setReenviando(usuario)
-    setAvisoEnvio(null)
-    try {
-      const r = await fetch(API_RESET, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'reenviar_temporal', usuario }),
-      })
-      const data = await r.json()
-      const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
-      if (body.codigo === 0) {
-        playSound('success')
-        setAvisoEnvio({ usuario, correo: body.correo_enmascarado, horas: body.horas_vigencia })
-      } else {
-        playSound('error')
-        alerta(setCrearErr, body.descripcion || 'No se pudo reenviar')
-      }
-    } catch {
-      alerta(setCrearErr, '⚠️ Error de conexión')
-    }
-    setReenviando(null)
   }
 
   function alternarRol(rol) {
@@ -740,8 +710,9 @@ export default function RRHH() {
                   persona elija su propia contraseña.
                 </div>
                 <div style={{ fontSize: 12, color: '#55705a', marginTop: 8, lineHeight: 1.5 }}>
-                  Nadie más la conoce, tú incluido. Si el correo no llega, usa
-                  "Reenviar contraseña" en la lista de abajo.
+                  Nadie más la conoce, tú incluido. Si el correo no llega o se
+                  vence, esa persona puede usar "¿Olvidaste tu contraseña?" en
+                  la pantalla de ingreso.
                 </div>
                 <button
                   onClick={() => setAvisoEnvio(null)}
@@ -763,16 +734,7 @@ export default function RRHH() {
                   <div style={{ fontSize: 12, color: '#888' }}>{u.correo || 'Sin correo registrado'}</div>
                 </div>
                 {u.usuario !== usuarioActual
-                  ? <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      <button
-                        onClick={() => reenviarTemporal(u.usuario)}
-                        disabled={reenviando === u.usuario}
-                        title="Genera una contraseña temporal nueva y la envía a su correo"
-                        style={{ background: '#eef3fb', border: 'none', color: '#1A2D5A', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: reenviando === u.usuario ? 'wait' : 'pointer' }}>
-                        {reenviando === u.usuario ? '⏳' : '✉️ Reenviar contraseña'}
-                      </button>
-                      <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>🗑️ Eliminar</button>
-                    </div>
+                  ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>🗑️ Eliminar</button>
                   : <span style={{ fontSize: 11, color: '#888', fontStyle: 'italic' }}>Tú</span>
                 }
               </div>

@@ -304,7 +304,7 @@ async function login(body) {
     // revela nada que quien la escribió no sepa ya.
     if (temporalVencida(usuario)) {
         log("WARN", "Acceso con contraseña temporal vencida", { email });
-        return error(403, `La contraseña temporal venció. Pide que te envíen una nueva.`);
+        return error(403, "La contraseña temporal venció. Usa \"¿Olvidaste tu contraseña?\" para recibir un código y definir la tuya.");
     }
 
     if (migrar) {
@@ -348,7 +348,7 @@ async function cambiarClavePropia(body) {
     }
     if (temporalVencida(usuario)) {
         log("WARN", "Cambio con temporal vencida", { email });
-        return error(403, "La contraseña temporal venció. Pide que te envíen una nueva.");
+        return error(403, "La contraseña temporal venció. Usa \"¿Olvidaste tu contraseña?\" para recibir un código y definir la tuya.");
     }
     if (clave_actual === nueva_clave) {
         return error(400, "La contraseña nueva debe ser distinta de la actual");
@@ -442,64 +442,14 @@ async function crearUsuario(body) {
     });
 }
 
-/**
- * Genera una temporal nueva para un usuario que ya existe y la envía por
- * correo. Sirve cuando la anterior venció o el mensaje no llegó. La
- * anterior deja de funcionar en el momento en que esta se guarda.
- */
-async function reenviarTemporal(body) {
-    const { usuario } = body;
-    if (!usuario) return error(400, "Falta el usuario");
-
-    const registro = await obtenerUsuario(usuario);
-    if (!registro) return error(404, "El usuario no existe");
-    if (!registro.desde_dynamo) {
-        return error(400, "El usuario de emergencia se administra por configuración");
-    }
-    if (!registro.correo_reset) {
-        return error(400, "El usuario no tiene un correo registrado");
-    }
-    if (!smtpConfigurado()) {
-        return error(503, "El envío de correo no está configurado. Avisa al administrador del sistema.");
-    }
-
-    const temporal = generarClaveTemporal();
-    await guardarClave(usuario, temporal, { debeCambiar: true });
-
-    try {
-        await enviarCorreo(registro.correo_reset,
-            "Tu nueva contraseña temporal de Biosecurity UCompensar",
-            correoClaveTemporal(usuario, temporal, { reenvio: true }));
-    } catch (e) {
-        // Acá no se revierte: la contraseña anterior ya quedó invalidada y
-        // volver atrás sin conocerla es imposible. Se avisa para reintentar.
-        log("ERROR", "Falló el reenvío de la temporal", { usuario, error: e.message });
-        return error(502, "No se pudo enviar el correo. La contraseña anterior ya no sirve: vuelve a reenviarla.");
-    }
-
-    log("INFO", "Temporal reenviada", { usuario, horas: HORAS_CLAVE_TEMPORAL });
-
-    return responder(200, {
-        codigo: 0,
-        descripcion: `Se envió una contraseña temporal nueva a ${enmascararCorreo(registro.correo_reset)}.`,
-        correo_enmascarado: enmascararCorreo(registro.correo_reset),
-        horas_vigencia: HORAS_CLAVE_TEMPORAL,
-    });
-}
-
 /** Cuerpo del correo que lleva la contraseña temporal. */
-function correoClaveTemporal(usuario, temporal, { reenvio = false } = {}) {
-    const encabezado = reenvio
-        ? "Se generó una contraseña temporal nueva para tu usuario."
-        : `Se creó tu usuario <strong>${usuario}</strong> en el sistema de control de acceso.`;
-
+function correoClaveTemporal(usuario, temporal) {
     return plantilla(`
-        <p style="color:#333">${encabezado}</p>
+        <p style="color:#333">Se creó tu usuario <strong>${usuario}</strong> en el sistema de control de acceso.</p>
         <p style="color:#333">Usuario: <strong>${usuario}</strong></p>
         <p style="color:#333">Contraseña temporal:</p>
         <p style="font-family:monospace;font-size:20px;letter-spacing:2px;background:#f4f4f4;padding:14px 18px;border-radius:8px;color:#111;display:inline-block">${temporal}</p>
         <p style="color:#333">Sirve únicamente para entrar una vez y elegir tu propia contraseña: el sistema te la va a pedir antes de dejarte usar nada. Vence en ${HORAS_CLAVE_TEMPORAL} horas.</p>
-        ${reenvio ? '<p style="color:#333">La temporal anterior ya no funciona.</p>' : ""}
         <p style="color:#888;font-size:13px">Nadie más recibió esta contraseña. Si no esperabas este mensaje, avisa al área responsable y no la uses.</p>`);
 }
 
@@ -690,7 +640,6 @@ function politica() {
 const ACCIONES = {
     login,
     crear_usuario: crearUsuario,
-    reenviar_temporal: reenviarTemporal,
     eliminar_usuario: eliminarUsuario,
     listar_usuarios: listarUsuarios,
     solicitar: solicitarCodigo,

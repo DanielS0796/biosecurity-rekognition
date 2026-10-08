@@ -217,24 +217,31 @@ check('entra con la propia', r.body.codigo === 0 && r.body.debe_cambiar_clave ==
 r = await pedir({ accion: 'login', email: 'ana', clave: temporalViva });
 check('la temporal ya no sirve', r.status === 401);
 
-console.log('\n── 16. Reenviar temporal invalida la anterior ──');
+console.log('\n── 16. Una temporal vencida se recupera sin ayuda de nadie ──');
 reset();
 await pedir({ accion: 'crear_usuario', usuario: 'ana', correo: 'ana@x.test', rol: 'rrhh' });
-const primera = extraerTemporal(mail.__enviados[0].html);
+const vencida = extraerTemporal(mail.__enviados[0].html);
+dyn.__estado.usuarios['ana'].clave_temporal_expira = { S: new Date(Date.now() - 1000).toISOString() };
+r = await pedir({ accion: 'login', email: 'ana', clave: vencida });
+check('vencida no entra', r.status === 403);
+check('y señala el camino', /olvidaste tu contraseña/i.test(r.body.descripcion), r.body.descripcion);
+
+// El flujo de recuperación por código es el que reemplaza al reenvío.
+r = await pedir({ accion: 'solicitar', email: 'ana' });
+check('pide el código', r.body.codigo === 0, JSON.stringify(r.body));
+const codigo = dyn.__estado.codigos['ana'].codigo.S;
+r = await pedir({ accion: 'cambiar', email: 'ana', codigo, nueva_clave: CLAVE_OK });
+check('restablece con el código', r.body.codigo === 0, JSON.stringify(r.body));
+r = await pedir({ accion: 'login', email: 'ana', clave: CLAVE_OK });
+check('entra con la nueva', r.body.codigo === 0, JSON.stringify(r.body));
+check('sin cambio pendiente', r.body.debe_cambiar_clave === false);
+check('y sin vencimiento colgando', !dyn.__estado.usuarios['ana'].clave_temporal_expira);
+r = await pedir({ accion: 'login', email: 'ana', clave: vencida });
+check('la vencida quedó muerta', r.status === 401);
+
+// La acción de reenvío se quitó: no debe quedar como superficie de API.
 r = await pedir({ accion: 'reenviar_temporal', usuario: 'ana' });
-check('reenvía', r.body.codigo === 0, JSON.stringify(r.body));
-check('sin exponer la nueva', !JSON.stringify(r.body).includes(extraerTemporal(mail.__enviados[1].html)));
-const segunda = extraerTemporal(mail.__enviados[1].html);
-check('la nueva es distinta', segunda !== primera);
-check('avisa que la anterior murió', /anterior ya no funciona/i.test(mail.__enviados[1].html));
-r = await pedir({ accion: 'login', email: 'ana', clave: primera });
-check('la primera ya no entra', r.status === 401);
-r = await pedir({ accion: 'login', email: 'ana', clave: segunda });
-check('la segunda sí', r.body.codigo === 0, JSON.stringify(r.body));
-r = await pedir({ accion: 'reenviar_temporal', usuario: 'fantasma' });
-check('no reenvía a quien no existe', r.status === 404);
-r = await pedir({ accion: 'reenviar_temporal', usuario: 'rescate' });
-check('no toca al admin de emergencia', r.body.codigo === 1, r.body.descripcion);
+check('reenviar_temporal ya no existe', r.status === 400, JSON.stringify(r.body));
 
 console.log('\n── 17. Si el correo no sale, el usuario no queda inaccesible ──');
 reset();
