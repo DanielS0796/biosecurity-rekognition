@@ -22,12 +22,15 @@ export const API_LIVENESS_RESULT =
 // ─────────────────────────────────────────────────────────────
 // APIs existentes
 // ─────────────────────────────────────────────────────────────
-// OBSOLETO — ninguna página lo usa desde que el acceso pasó a liveness.
-// Este endpoint recibe una imagen en el cuerpo y registra el acceso sin
-// comprobar que haya una persona real: una fotografía lo supera. Sigue
-// activo en AWS, así que conviene deshabilitarlo (quitar el stage o el
-// despliegue del API 9bm7r0q9wi) para cerrar esa vía.
-export const API_VALIDAR   = "https://9bm7r0q9wi.execute-api.us-east-1.amazonaws.com/best/validar";
+// Acá vivía API_VALIDAR, el endpoint del API 9bm7r0q9wi. Recibía una
+// imagen en el cuerpo y registraba el acceso sin comprobar que hubiera
+// una persona real: una fotografía lo superaba. Es el agujero que
+// motivó pasar el acceso a liveness.
+//
+// Se quita del código y se cierra el stage en AWS. No se reemplaza por
+// nada: el acceso ahora va por API_LIVENESS_INIT y API_LIVENESS_RESULT,
+// donde la imagen que se compara es la que entrega Rekognition, no una
+// que mande el navegador.
 export const API_RRHH_URL  = "https://uadjcukyx1.execute-api.us-east-1.amazonaws.com/prod/registrar";
 export const API_AUDITORIA = "https://3tqg18yo1l.execute-api.us-east-1.amazonaws.com/prod/reporte";
 export const API_RESET     = "https://0geuesizya.execute-api.us-east-1.amazonaws.com/prod/reset";
