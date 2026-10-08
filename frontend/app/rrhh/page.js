@@ -690,11 +690,6 @@ export default function RRHH() {
                 ))}
               </div>
             </div>
-            <div style={{ marginBottom: 14, padding: 11, background: '#f0f4ff', borderRadius: 10, fontSize: 12, color: '#333', lineHeight: 1.5 }}>
-              El sistema genera una contraseña temporal y se la envía al correo que
-              registres acá. Tú no la ves: vence en 72 horas y solo le sirve a esa
-              persona para elegir la suya al ingresar.
-            </div>
             {crearErr && <div style={{ ...alertErr, marginBottom: 10 }}>{crearErr}</div>}
             {crearOk && <div style={{ ...alertOk, marginBottom: 10 }}>{crearOk}</div>}
             <button style={btnPrimary} onClick={crearUsuario} disabled={crearLoading}>{crearLoading ? '⏳ Creando...' : 'Crear usuario'}</button>
