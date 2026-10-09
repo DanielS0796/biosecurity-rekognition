@@ -34,7 +34,7 @@ export default function Aviso({ tipo = 'error', children, style }) {
                 alignItems: 'center',
                 gap: 10,
                 padding: '12px 16px',
-                borderRadius: 12,
+                borderRadius: 'var(--r-control)',
                 fontSize: 14,
                 fontWeight: 700,
                 background: fondo,

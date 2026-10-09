@@ -6,6 +6,7 @@ import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 import { ArrowLeft, BarChart3, RefreshCw, ScanFace, Search, ShieldCheck, Users } from 'lucide-react'
 import Aviso from '../components/Aviso'
+import Fondo from '../components/Fondo'
 
 // Mismo vocabulario que el módulo de registro. El valor guardado va en
 // minúscula; acá se presenta.
@@ -311,22 +312,10 @@ export default function Auditoria() {
     setResetLoading(false)
   }
 
-  const cardStyle = { background: 'rgba(255,255,255,0.75)', borderRadius: 20, padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.4)' }
-  const inputStyle = { width: '100%', padding: '13px 16px', border: '2px solid #e8e8e8', borderRadius: 12, fontFamily: 'Nunito, sans-serif', fontSize: 15, outline: 'none', background: '#fafafa' }
-  const btnPrimary = { width: '100%', padding: 16, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 15px rgba(240,90,34,0.35)' }
+  const cardStyle = { background: 'rgba(255,255,255,0.75)', borderRadius: 'var(--r-tarjeta)', padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: 'var(--sombra-flotante)', border: '1px solid rgba(255,255,255,0.4)' }
+  const inputStyle = { width: '100%', padding: '13px 16px', border: '2px solid #e8e8e8', borderRadius: 'var(--r-control)', fontFamily: 'Nunito, sans-serif', fontSize: 15, outline: 'none', background: '#fafafa' }
+  const btnPrimary = { width: '100%', padding: 16, border: 'none', borderRadius: 'var(--r-control)', background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: 'var(--sombra-accion)' }
 
-  const Fondo = () => (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr 1fr', height: '100%' }}>
-        {['#F05A22,#FF8C42', '#4B2D8F,#6B4CC0', '#00B4D8,#0077A8', '#1A2D5A,#2D4A8A', '#F05A22,#4B2D8F', '#00B4D8,#4B2D8F', '#4B2D8F,#00B4D8', '#1A2D5A,#F05A22', '#F05A22,#1A2D5A'].map((g, i) => (
-          <div key={i} style={{ background: `linear-gradient(135deg, ${g})`, filter: 'saturate(0.6) brightness(0.7)' }} />
-        ))}
-      </div>
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(160deg, rgba(75,45,143,0.75) 0%, rgba(26,45,90,0.85) 50%, rgba(75,45,143,0.75) 100%)' }} />
-      <div style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'rgba(240,90,34,0.35)', top: -80, left: -80 }} />
-      <div style={{ position: 'absolute', width: 250, height: 250, borderRadius: '50%', background: 'rgba(0,180,216,0.25)', bottom: 100, right: -60 }} />
-    </div>
-  )
 
   if (cambioPendiente) return (
     <CambioClaveObligatorio
@@ -353,7 +342,7 @@ export default function Auditoria() {
       <Fondo />
       <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div style={{ padding: '40px 20px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={16} aria-hidden="true" />Volver</Link>
+          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 'var(--r-pildora)', cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={16} aria-hidden="true" />Volver</Link>
           <Image src="/Logocomp.png" alt="UCompensar" width={120} height={44} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', marginTop: 8 }} />
           <div style={{ color: 'white', fontSize: 13, fontWeight: 700, letterSpacing: 1, textAlign: 'center' }}>
             PANEL DE AUDITORÍA<br />
@@ -386,7 +375,7 @@ export default function Auditoria() {
 
       {resetModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'white', borderRadius: 20, padding: 28, width: '90%', maxWidth: 380 }}>
+          <div style={{ background: 'white', borderRadius: 'var(--r-tarjeta)', padding: 28, width: '90%', maxWidth: 380 }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <ShieldCheck size={32} strokeWidth={2} aria-hidden="true" />
               <div style={{ fontSize: 18, fontWeight: 800, color: '#1A2D5A' }}>Restablecer contraseña</div>
@@ -412,7 +401,7 @@ export default function Auditoria() {
               {resetOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{resetOk}</Aviso>}
               <button style={btnPrimary} onClick={cambiarClave} disabled={resetLoading}>{resetLoading ? 'Guardando…' : 'Guardar contraseña'}</button>
             </>}
-            <button onClick={() => setResetModal(false)} style={{ width: '100%', marginTop: 12, background: 'none', border: '2px solid #ddd', borderRadius: 12, padding: 10, fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, color: '#888', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => setResetModal(false)} style={{ width: '100%', marginTop: 12, background: 'none', border: '2px solid #ddd', borderRadius: 'var(--r-control)', padding: 10, fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, color: '#888', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -431,13 +420,13 @@ export default function Auditoria() {
 
         {/* NAVBAR */}
         <div style={{ display: 'flex', gap: 6, padding: '14px 16px 0' }}>
-          <Link href="/" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+          <Link href="/" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 'var(--r-control)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
             <ScanFace size={18} aria-hidden="true" /><span>Acceso</span>
           </Link>
-          <Link href="/rrhh" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+          <Link href="/rrhh" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 'var(--r-control)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
             <Users size={18} aria-hidden="true" /><span>Registro</span>
           </Link>
-          <button style={{ flex: 1, padding: '10px 6px', border: '1.5px solid var(--orange)', borderRadius: 12, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <button style={{ flex: 1, padding: '10px 6px', border: '1.5px solid var(--orange)', borderRadius: 'var(--r-control)', background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <BarChart3 size={18} aria-hidden="true" /><span>Auditoría</span>
           </button>
         </div>
@@ -454,7 +443,7 @@ export default function Auditoria() {
               // persona figura como que sigue adentro.
               { num: visibles.filter(i => !i.hora_salida).length, lbl: 'Sin salida', color: '#c62828' }
             ].map((s, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 14, padding: '14px 8px', textAlign: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
+              <div key={i} style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 'var(--r-control)', padding: '14px 8px', textAlign: 'center', boxShadow: 'var(--sombra-tarjeta)' }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.num}</div>
                 <div style={{ fontSize: 11, color: '#666', marginTop: 2, fontWeight: 600 }}>{s.lbl}</div>
               </div>
@@ -465,7 +454,7 @@ export default function Auditoria() {
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)' }}>Registro de Accesos</div>
-              <button onClick={logout} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer' }}>Cerrar sesión</button>
+              <button onClick={logout} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 'var(--r-pildora)', cursor: 'pointer' }}>Cerrar sesión</button>
             </div>
 
             {/* FILTROS */}
@@ -481,10 +470,10 @@ export default function Auditoria() {
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-              <button onClick={cargarAuditoria} disabled={loading} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+              <button onClick={cargarAuditoria} disabled={loading} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 'var(--r-control)', background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
                 {loading ? 'Buscando...' : 'Buscar'}
               </button>
-              <button onClick={exportarExcel} disabled={exportando} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: exportando ? 'wait' : 'pointer', opacity: exportando ? 0.5 : 1 }}>
+              <button onClick={exportarExcel} disabled={exportando} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 'var(--r-control)', background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: exportando ? 'wait' : 'pointer', opacity: exportando ? 0.5 : 1 }}>
                 {exportando ? 'Generando…' : busqueda.trim() ? 'Exportar histórico de la búsqueda' : 'Exportar histórico completo'}
               </button>
             </div>
@@ -513,7 +502,7 @@ export default function Auditoria() {
                 disabled={loading}
                 aria-label="Actualizar la tabla"
                 title="Actualizar"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flexShrink: 0, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flexShrink: 0, border: 'none', borderRadius: 'var(--r-control)', background: 'var(--blue)', color: 'white', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}>
                 <RefreshCw size={17} className={loading ? 'girando' : undefined} aria-hidden="true" />
               </button>
             </div>
@@ -541,7 +530,7 @@ export default function Auditoria() {
                     Si la persona entró antes, amplía el rango y vuelve a buscar.
                   </div>
                 </div>
-              : <div style={{ overflowX: 'auto', borderRadius: 14 }}>
+              : <div style={{ overflowX: 'auto', borderRadius: 'var(--r-control)' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
@@ -575,7 +564,7 @@ export default function Auditoria() {
                                     {item.fecha_salida || ''}
                                   </div>
                                 </>
-                              : <span style={{ background: '#fff3e0', color: '#e65100', border: '1px solid #ffb74d', borderRadius: 20, padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
+                              : <span style={{ background: '#fff3e0', color: '#e65100', border: '1px solid #ffb74d', borderRadius: 'var(--r-pildora)', padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
                                   Sin salida
                                 </span>}
                           </td>

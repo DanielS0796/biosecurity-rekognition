@@ -8,6 +8,7 @@ import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 import ConsentimientoDatos from '../components/ConsentimientoDatos'
 import { ArrowLeft, BarChart3, Check, DoorOpen, LoaderCircle, ScanFace, Search, ShieldCheck, Trash2, TriangleAlert, UserCog, UserPlus, Users } from 'lucide-react'
 import Aviso from '../components/Aviso'
+import Fondo from '../components/Fondo'
 
 // Vínculo de la persona con la institución. Es una universidad: quien
 // entra puede no ser empleado de nadie. El orden es por frecuencia
@@ -447,23 +448,11 @@ export default function RRHH() {
     setResetLoading(false)
   }
 
-  const cardStyle = { background: 'rgba(255,255,255,0.75)', borderRadius: 20, padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.4)' }
-  const inputStyle = { width: '100%', padding: '13px 16px', border: '2px solid #e8e8e8', borderRadius: 12, fontFamily: 'Nunito, sans-serif', fontSize: 15, outline: 'none', background: '#fafafa' }
-  const btnPrimary = { width: '100%', padding: 16, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 15px rgba(240,90,34,0.35)' }
-  const btnSecondary = { width: '100%', padding: 14, border: '2px solid var(--blue)', borderRadius: 14, background: 'transparent', color: 'var(--blue)', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }
+  const cardStyle = { background: 'rgba(255,255,255,0.75)', borderRadius: 'var(--r-tarjeta)', padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: 'var(--sombra-flotante)', border: '1px solid rgba(255,255,255,0.4)' }
+  const inputStyle = { width: '100%', padding: '13px 16px', border: '2px solid #e8e8e8', borderRadius: 'var(--r-control)', fontFamily: 'Nunito, sans-serif', fontSize: 15, outline: 'none', background: '#fafafa' }
+  const btnPrimary = { width: '100%', padding: 16, border: 'none', borderRadius: 'var(--r-control)', background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: 'var(--sombra-accion)' }
+  const btnSecondary = { width: '100%', padding: 14, border: '2px solid var(--blue)', borderRadius: 'var(--r-control)', background: 'transparent', color: 'var(--blue)', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }
 
-  const Fondo = () => (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: '1fr 1fr 1fr', height: '100%' }}>
-        {['#F05A22,#FF8C42','#4B2D8F,#6B4CC0','#00B4D8,#0077A8','#1A2D5A,#2D4A8A','#F05A22,#4B2D8F','#00B4D8,#4B2D8F','#4B2D8F,#00B4D8','#1A2D5A,#F05A22','#F05A22,#1A2D5A'].map((g, i) => (
-          <div key={i} style={{ background: `linear-gradient(135deg, ${g})`, filter: 'saturate(0.6) brightness(0.7)' }} />
-        ))}
-      </div>
-      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(160deg, rgba(75,45,143,0.75) 0%, rgba(26,45,90,0.85) 50%, rgba(75,45,143,0.75) 100%)' }} />
-      <div style={{ position: 'absolute', width: 300, height: 300, borderRadius: '50%', background: 'rgba(240,90,34,0.35)', top: -80, left: -80 }} />
-      <div style={{ position: 'absolute', width: 250, height: 250, borderRadius: '50%', background: 'rgba(0,180,216,0.25)', bottom: 100, right: -60 }} />
-    </div>
-  )
 
   if (cambioPendiente) return (
     <CambioClaveObligatorio
@@ -490,7 +479,7 @@ export default function RRHH() {
       <Fondo />
       <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div style={{ padding: '40px 20px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={16} aria-hidden="true" />Volver</Link>
+          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 'var(--r-pildora)', cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={16} aria-hidden="true" />Volver</Link>
           <Image src="/Logocomp.png" alt="UCompensar" width={120} height={44} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', marginTop: 8 }} />
           <div style={{ color: 'white', fontSize: 13, fontWeight: 700, letterSpacing: 1, textAlign: 'center' }}>
             PANEL RECURSOS HUMANOS<br />
@@ -524,7 +513,7 @@ export default function RRHH() {
       {/* MODAL RESET */}
       {resetModal && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'white', borderRadius: 20, padding: 28, width: '90%', maxWidth: 380 }}>
+          <div style={{ background: 'white', borderRadius: 'var(--r-tarjeta)', padding: 28, width: '90%', maxWidth: 380 }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <ShieldCheck size={32} strokeWidth={2} aria-hidden="true" />
               <div style={{ fontSize: 18, fontWeight: 800, color: '#1A2D5A' }}>Restablecer contraseña</div>
@@ -550,7 +539,7 @@ export default function RRHH() {
               {resetOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{resetOk}</Aviso>}
               <button style={btnPrimary} onClick={cambiarClave} disabled={resetLoading}>{resetLoading ? 'Guardando…' : 'Guardar contraseña'}</button>
             </>}
-            <button onClick={() => setResetModal(false)} style={{ width: '100%', marginTop: 12, background: 'none', border: '2px solid #ddd', borderRadius: 12, padding: 10, fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, color: '#888', cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={() => setResetModal(false)} style={{ width: '100%', marginTop: 12, background: 'none', border: '2px solid #ddd', borderRadius: 'var(--r-control)', padding: 10, fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, color: '#888', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
       )}
@@ -569,13 +558,13 @@ export default function RRHH() {
 
         {/* NAVBAR */}
         <div style={{ display: 'flex', gap: 6, padding: '14px 16px 0' }}>
-          <Link href="/" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+          <Link href="/" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 'var(--r-control)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
             <ScanFace size={18} aria-hidden="true" /><span>Acceso</span>
           </Link>
-          <button style={{ flex: 1, padding: '10px 6px', border: '1.5px solid var(--orange)', borderRadius: 12, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <button style={{ flex: 1, padding: '10px 6px', border: '1.5px solid var(--orange)', borderRadius: 'var(--r-control)', background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <Users size={18} aria-hidden="true" /><span>Registro</span>
           </button>
-          <Link href="/auditoria" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
+          <Link href="/auditoria" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 'var(--r-control)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
             <BarChart3 size={18} aria-hidden="true" /><span>Auditoría</span>
           </Link>
         </div>
@@ -590,13 +579,13 @@ export default function RRHH() {
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)' }}>Registrar Persona</div>
                 <div style={{ fontSize: 13, color: '#666' }}>Verificación de persona viva</div>
               </div>
-              <button onClick={logout} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer' }}>Cerrar sesión</button>
+              <button onClick={logout} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 16px', borderRadius: 'var(--r-pildora)', cursor: 'pointer' }}>Cerrar sesión</button>
             </div>
 
             {/* PASO 1 — datos de la persona */}
             {pasoRegistro === 'datos' && (
               <>
-                <div style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 12, borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.5 }}>
+                <div style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 'var(--r-control)', borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.5 }}>
                   La persona hará un escaneo en vivo: deberá centrar el rostro en el
                   óvalo{sinDestellos ? '' : ' mientras la pantalla emite destellos de color'}.
                   Una fotografía impresa o en otra pantalla no supera esta prueba.
@@ -617,7 +606,7 @@ export default function RRHH() {
                         key={clave}
                         onClick={() => setTipoPersona(clave)}
                         style={{
-                          flex: '1 1 auto', minWidth: 104, padding: '11px 10px', borderRadius: 12,
+                          flex: '1 1 auto', minWidth: 104, padding: '11px 10px', borderRadius: 'var(--r-control)',
                           border: tipoPersona === clave ? '2px solid var(--blue)' : '2px solid #e2e2e2',
                           background: tipoPersona === clave ? 'var(--blue)' : 'transparent',
                           color: tipoPersona === clave ? '#fff' : '#777',
@@ -637,7 +626,7 @@ export default function RRHH() {
                     bloquea estos mensajes.
                   </div>
                 </div>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16, padding: 12, background: '#fffaf0', borderRadius: 12, border: '1px solid #f0c070', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 16, padding: 12, background: '#fffaf0', borderRadius: 'var(--r-control)', border: '1px solid #f0c070', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={sinDestellos}
@@ -667,7 +656,7 @@ export default function RRHH() {
             {/* PASO 3 — escaneo en vivo */}
             {pasoRegistro === 'escaneo' && (
               <>
-                <div style={{ marginBottom: 12, padding: 12, background: '#f7f7f7', borderRadius: 12, fontSize: 12, color: '#444' }}>
+                <div style={{ marginBottom: 12, padding: 12, background: '#f7f7f7', borderRadius: 'var(--r-control)', fontSize: 12, color: '#444' }}>
                   Registrando a <strong>{nombre}</strong> · CC {identificacion}
                 </div>
                 {/* El escaneo se dibuja sobre toda la pantalla desde un
@@ -690,7 +679,7 @@ export default function RRHH() {
             {/* PASO 3 — resultado */}
             {pasoRegistro === 'listo' && resultadoRegistro && (
               <>
-                <div style={{ marginBottom: 14, padding: 16, background: '#e8f5e9', borderRadius: 12, border: '2px solid #2e7d32' }}>
+                <div style={{ marginBottom: 14, padding: 16, background: '#e8f5e9', borderRadius: 'var(--r-control)', border: '2px solid #2e7d32' }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: '#2e7d32', marginBottom: 8 }}>
                     Persona registrada
                   </div>
@@ -718,20 +707,20 @@ export default function RRHH() {
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación</label>
                 <input style={inputStyle} type="text" placeholder="Ej: 1234567890" value={eliminarId} onChange={e => setEliminarId(e.target.value)} onKeyDown={e => e.key === 'Enter' && buscarEmpleado()} />
               </div>
-              <button onClick={buscarEmpleado} style={{ padding: '13px 16px', border: 'none', borderRadius: 12, background: 'var(--blue)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Buscar"><Search size={18} aria-hidden="true" /></button>
+              <button onClick={buscarEmpleado} style={{ padding: '13px 16px', border: 'none', borderRadius: 'var(--r-control)', background: 'var(--blue)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Buscar"><Search size={18} aria-hidden="true" /></button>
             </div>
             {buscarLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13 }}>Buscando…</div>}
             {empleadoEncontrado && (
-              <div style={{ marginTop: 10, padding: 16, background: '#fff3e0', borderRadius: 12, border: '2px solid #FF9800' }}>
+              <div style={{ marginTop: 10, padding: 16, background: '#fff3e0', borderRadius: 'var(--r-control)', border: '2px solid #FF9800' }}>
                 <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>Persona encontrada:</div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--blue)' }}>{empleadoEncontrado.nombre}</div>
                 <div style={{ fontSize: 13, color: '#666', marginTop: 2 }}>CC: {eliminarId}</div>
-                <div style={{ marginTop: 14, padding: 10, background: '#fdecea', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c62828', fontWeight: 600 }}>
+                <div style={{ marginTop: 14, padding: 10, background: '#fdecea', borderRadius: 'var(--r-control)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c62828', fontWeight: 600 }}>
                   <TriangleAlert size={16} style={{ flexShrink: 0 }} aria-hidden="true" />
                   Esta acción eliminará a la persona y no se puede deshacer
                 </div>
-                <button onClick={confirmarEliminar} style={{ width: '100%', marginTop: 12, padding: 13, border: 'none', borderRadius: 12, background: '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={17} aria-hidden="true" />Confirmar Eliminación</button>
-                <button onClick={() => { setEmpleadoEncontrado(null); setEliminarId('') }} style={{ width: '100%', marginTop: 8, padding: 11, border: '2px solid #888', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={confirmarEliminar} style={{ width: '100%', marginTop: 12, padding: 13, border: 'none', borderRadius: 'var(--r-control)', background: '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={17} aria-hidden="true" />Confirmar Eliminación</button>
+                <button onClick={() => { setEmpleadoEncontrado(null); setEliminarId('') }} style={{ width: '100%', marginTop: 8, padding: 11, border: '2px solid #888', borderRadius: 'var(--r-control)', background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
               </div>
             )}
             {elimLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13, marginTop: 8 }}>Eliminando…</div>}
@@ -746,7 +735,7 @@ export default function RRHH() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 800, color: '#2e7d32' }}><Users size={17} aria-hidden="true" />Personas Activas</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{activos.length > 0 ? `${activos.length} persona${activos.length !== 1 ? 's' : ''}` : '—'}</div>
               </div>
-              <button onClick={toggleActivos} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 20, cursor: 'pointer' }}>
+              <button onClick={toggleActivos} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 'var(--r-pildora)', cursor: 'pointer' }}>
                 {activosLoading ? <LoaderCircle size={15} className="girando" aria-hidden="true" /> : mostrarActivos ? 'Ocultar' : 'Ver todos'}
               </button>
             </div>
@@ -777,7 +766,7 @@ export default function RRHH() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 800, color: '#c62828' }}><DoorOpen size={17} aria-hidden="true" />Personas Retiradas</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{retirados.length > 0 ? `${retirados.length} retirado${retirados.length !== 1 ? 's' : ''}` : '—'}</div>
               </div>
-              <button onClick={toggleRetirados} style={{ background: '#c62828', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 20, cursor: 'pointer' }}>
+              <button onClick={toggleRetirados} style={{ background: '#c62828', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 'var(--r-pildora)', cursor: 'pointer' }}>
                 {retiradosLoading ? <LoaderCircle size={15} className="girando" aria-hidden="true" /> : mostrarRetirados ? 'Ocultar' : 'Ver todos'}
               </button>
             </div>
@@ -814,7 +803,7 @@ export default function RRHH() {
                     type="button"
                     onClick={() => alternarRol(valor)}
                     style={{
-                      flex: 1, padding: '11px 12px', borderRadius: 10, cursor: 'pointer',
+                      flex: 1, padding: '11px 12px', borderRadius: 'var(--r-control)', cursor: 'pointer',
                       fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700,
                       border: nuevoRoles.includes(valor) ? '2px solid var(--blue)' : '2px solid #ddd',
                       background: nuevoRoles.includes(valor) ? 'var(--blue)' : 'transparent',
@@ -830,7 +819,7 @@ export default function RRHH() {
             <button style={btnPrimary} onClick={crearUsuario} disabled={crearLoading}>{crearLoading ? 'Creando…' : 'Crear usuario'}</button>
 
             {avisoEnvio && (
-              <div style={{ marginTop: 14, padding: 14, background: '#f1f8f2', borderRadius: 12, border: '2px solid #2e7d32', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ marginTop: 14, padding: 14, background: '#f1f8f2', borderRadius: 'var(--r-control)', border: '2px solid #2e7d32', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <Check size={16} aria-hidden="true" />
                 <div style={{ flex: 1, fontSize: 13, color: '#1b5e20', lineHeight: 1.5 }}>
                   Usuario <strong>{avisoEnvio.usuario}</strong> creado. Su contraseña de
@@ -847,7 +836,7 @@ export default function RRHH() {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#1A2D5A' }}><Users size={15} aria-hidden="true" />Usuarios registrados</div>
-              <button onClick={cargarUsuarios} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>Actualizar</button>
+              <button onClick={cargarUsuarios} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 'var(--r-pildora)', cursor: 'pointer' }}>Actualizar</button>
             </div>
             {usuariosLoading && <div style={{ textAlign: 'center', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13 }}><LoaderCircle size={15} className="girando" aria-hidden="true" />Cargando…</div>}
             {usuarios.map(u => {
@@ -864,7 +853,7 @@ export default function RRHH() {
                     </div>
                   </div>
                   {u.usuario !== usuarioActual
-                    ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Trash2 size={13} aria-hidden="true" />Eliminar</button>
+                    ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 'var(--r-pildora)', cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Trash2 size={13} aria-hidden="true" />Eliminar</button>
                     : <span style={{ fontSize: 11, color: '#888', fontStyle: 'italic', flexShrink: 0 }}>Tú</span>
                   }
                 </div>
@@ -882,7 +871,7 @@ export default function RRHH() {
                           background: activo ? '#1A2D5A' : 'transparent',
                           color: activo ? '#fff' : '#999',
                           fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700,
-                          padding: '5px 12px', borderRadius: 14,
+                          padding: '5px 12px', borderRadius: 'var(--r-control)',
                           // Sin opacidad rebajada: un chip encendido al 50%
                           // se lee como apagado, y entonces la fila parece
                           // decir que el usuario no tiene permisos cuando
@@ -898,7 +887,7 @@ export default function RRHH() {
                     <button
                       onClick={() => guardarRoles(u.usuario)}
                       disabled={guardandoRoles === u.usuario}
-                      style={{ border: 'none', background: 'var(--orange)', color: '#fff', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 14, cursor: 'pointer' }}>
+                      style={{ border: 'none', background: 'var(--orange)', color: '#fff', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 'var(--r-control)', cursor: 'pointer' }}>
                       {guardandoRoles === u.usuario ? <LoaderCircle size={15} className="girando" aria-hidden="true" /> : 'Guardar'}
                     </button>
                   )}

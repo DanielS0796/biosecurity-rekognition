@@ -201,7 +201,7 @@ const e = {
 
   marco: {
     marginTop: 32, padding: '22px 24px',
-    background: '#fff', borderRadius: 14,
+    background: '#fff', borderRadius: 'var(--r-control)',
     borderLeft: '4px solid var(--blue)',
   },
   marcoTexto: {
@@ -212,7 +212,7 @@ const e = {
   casillaFila: {
     display: 'flex', gap: 14, alignItems: 'flex-start',
     marginTop: 28, padding: '20px 22px',
-    background: '#fff', borderRadius: 14,
+    background: '#fff', borderRadius: 'var(--r-control)',
     border: '2px solid var(--blue)', cursor: 'pointer',
   },
   casilla: {
@@ -236,12 +236,12 @@ const e = {
     display: 'flex', gap: 12,
   },
   botonRechazo: {
-    flex: 1, padding: '15px 12px', borderRadius: 12,
+    flex: 1, padding: '15px 12px', borderRadius: 'var(--r-control)',
     border: '2px solid #ccd2dc', background: 'transparent', color: '#5a616b',
     fontFamily: 'inherit', fontSize: 15, fontWeight: 700, cursor: 'pointer',
   },
   botonAutoriza: {
-    flex: 2, padding: '15px 12px', borderRadius: 12, border: 'none',
+    flex: 2, padding: '15px 12px', borderRadius: 'var(--r-control)', border: 'none',
     fontFamily: 'inherit', fontSize: 15, fontWeight: 800,
   },
 }

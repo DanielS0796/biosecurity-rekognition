@@ -10,6 +10,24 @@
   --white: #ffffff;
   --glass: rgba(255,255,255,0.15);
   --glass-strong: rgba(255,255,255,0.92);
+
+  /* ── Forma ──────────────────────────────────────────────────────
+     Tres radios y tres sombras, y nada más. Antes había siete radios
+     distintos —8, 10, 12, 14, 16, 18 y 20— y cuatro sombras, no por
+     decisión sino por acumulación: cada pantalla se escribió aparte y
+     ninguna volvió a mirar la anterior. Eso se nota aunque nadie sepa
+     nombrarlo, y es una de las cosas que hacen que una interfaz
+     parezca armada por partes.
+
+     Los valores son los que ya predominaban, así que esto no cambia el
+     aspecto: lo ordena. */
+  --r-control: 12px;   /* campos, botones, celdas de acción */
+  --r-tarjeta: 18px;   /* tarjetas, paneles y modales */
+  --r-pildora: 999px;  /* botones pequeños y etiquetas de estado */
+
+  --sombra-tarjeta: 0 4px 15px rgba(0,0,0,0.10);
+  --sombra-flotante: 0 8px 32px rgba(0,0,0,0.25);
+  --sombra-accion: 0 4px 15px rgba(240,90,34,0.35);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
