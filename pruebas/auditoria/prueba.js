@@ -124,18 +124,66 @@ check('con margen de un día por lado',
   scan.ExpressionAttributeValues[':fin'].S.startsWith('2026-11-01'),
   JSON.stringify(scan.ExpressionAttributeValues));
 
-console.log('\n── 10. Varias entradas en el día: vale la primera y la última salida ──');
+console.log('\n── 10. Cada entrada con su salida es una fila ──');
+// Antes esta prueba afirmaba lo contrario: que varias entradas en el día
+// se resumían en la primera entrada y la última salida. Era una decisión,
+// no un descuido, pero esconde la información que el reporte existe para
+// dar: quién estuvo dentro y cuándo. Quien entra y sale tres veces estuvo
+// dentro tres veces.
+reset();
+// 13:00 y 14:00 UTC son 08:00 y 09:00 en Bogotá; 20:10 y 21:20 son 15:10
+// y 16:20.
+dyn.__estado.accesos = [
+  acceso('100', 'Ana', '2026-10-06T13:00:00Z', 'ENTRADA'),
+  acceso('100', 'Ana', '2026-10-06T14:00:00Z', 'SALIDA'),
+  acceso('100', 'Ana', '2026-10-06T20:10:00Z', 'ENTRADA'),
+  acceso('100', 'Ana', '2026-10-06T21:20:00Z', 'SALIDA'),
+];
+r = await pedir({ format: 'json' });
+check('dos visitas, no una', r.json.items.length === 2, `-> ${r.json.items.length}`);
+// El reporte va de lo más reciente a lo más viejo.
+check('la segunda entró 15:10', r.json.items[0]?.hora_entrada === '15:10', r.json.items[0]?.hora_entrada);
+check('y salió 16:20', r.json.items[0]?.hora_salida === '16:20', r.json.items[0]?.hora_salida);
+check('la primera entró 08:00', r.json.items[1]?.hora_entrada === '08:00', r.json.items[1]?.hora_entrada);
+check('y salió 09:00', r.json.items[1]?.hora_salida === '09:00', r.json.items[1]?.hora_salida);
+check('las dos con el mismo nombre', r.json.items.every(i => i.nombre === 'Ana'));
+
+console.log('\n── 10b. Las dos visitas también salen en el CSV ──');
+r = await pedir({});
+const lineasAna = r.body.split('\n').filter(l => l.includes('Ana'));
+check('dos filas en el CSV', lineasAna.length === 2, `-> ${lineasAna.length}`);
+check('con sus dos horas de entrada',
+  lineasAna.some(l => l.includes('08:00')) && lineasAna.some(l => l.includes('15:10')),
+  lineasAna.join(' | '));
+
+console.log('\n── 10c. Una entrada sin salida no se traga la siguiente ──');
+// Si alguien olvida marcar la salida, su visita queda abierta. La
+// siguiente entrada abre otra visita en vez de perderse.
 reset();
 dyn.__estado.accesos = [
   acceso('100', 'Ana', '2026-10-06T13:00:00Z', 'ENTRADA'),
-  acceso('100', 'Ana', '2026-10-06T18:00:00Z', 'ENTRADA'),
-  acceso('100', 'Ana', '2026-10-06T20:00:00Z', 'SALIDA'),
-  acceso('100', 'Ana', '2026-10-06T22:00:00Z', 'SALIDA'),
+  acceso('100', 'Ana', '2026-10-06T20:00:00Z', 'ENTRADA'),
+  acceso('100', 'Ana', '2026-10-06T21:00:00Z', 'SALIDA'),
 ];
 r = await pedir({ format: 'json' });
-check('un registro del día', r.json.items.length === 1, `-> ${r.json.items.length}`);
-check('primera entrada 08:00', r.json.items[0]?.hora_entrada === '08:00', r.json.items[0]?.hora_entrada);
-check('última salida 17:00', r.json.items[0]?.hora_salida === '17:00', r.json.items[0]?.hora_salida);
+check('dos visitas', r.json.items.length === 2, `-> ${r.json.items.length}`);
+check('la abandonada queda sin salida',
+  r.json.items.find(i => i.hora_entrada === '08:00')?.hora_salida === '',
+  JSON.stringify(r.json.items));
+check('la cerrada conserva la suya',
+  r.json.items.find(i => i.hora_entrada === '15:00')?.hora_salida === '16:00',
+  JSON.stringify(r.json.items));
+
+console.log('\n── 10d. Una salida huérfana se muestra, no se esconde ──');
+// No debería pasar, porque el Lambda solo marca SALIDA si hay una entrada
+// abierta. Si pasa, es una señal de que algo falló y el reporte tiene que
+// dejarla ver.
+reset();
+dyn.__estado.accesos = [acceso('100', 'Ana', '2026-10-06T21:00:00Z', 'SALIDA')];
+r = await pedir({ format: 'json' });
+check('aparece la fila', r.json.items.length === 1, `-> ${r.json.items.length}`);
+check('sin hora de entrada', r.json.items[0]?.hora_entrada === '', r.json.items[0]?.hora_entrada);
+check('con su hora de salida', r.json.items[0]?.hora_salida === '16:00', r.json.items[0]?.hora_salida);
 
 console.log('\n── 11. Fechas inválidas se ignoran en lugar de romper ──');
 reset();

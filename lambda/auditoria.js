@@ -88,15 +88,28 @@ async function leerAccesos({ desde, hasta }) {
     return items;
 }
 
+// Margen para emparejar una salida con su entrada. Evita que la salida
+// de hoy cierre una entrada de la semana pasada que quedó abierta porque
+// alguien olvidó marcarla.
+const VENTANA_VISITA_MS = 24 * 60 * 60 * 1000;
+
 function agrupar(items) {
-    const registros = {};
+    // Una fila por visita: una entrada con su salida.
+    //
+    // Antes se agrupaba por persona y día, conservando la primera
+    // entrada y la última salida. Quien entraba y salía tres veces
+    // aparecía una sola vez, con un rango que nunca ocurrió: la entrada
+    // de la mañana junto a la salida de la tarde, como si no se hubiera
+    // ido en el medio. En un reporte de control de acceso eso no es un
+    // resumen, es la información que el reporte existe para dar.
+
+    const eventos = [];
 
     for (const item of items) {
         const id = item.identificacion?.S || "DESCONOCIDO";
         const fechaHora = item.fecha_hora?.S || "";
         const tipo = item.tipo_acceso?.S || item.resultado?.S || "";
         const resultado = item.resultado?.S || "";
-        const nombreReg = item.nombre?.S || "";
 
         if (id === "DESCONOCIDO") continue;
         if (resultado === "FALLIDO" || resultado === "RECHAZADO") continue;
@@ -104,38 +117,63 @@ function agrupar(items) {
         const fecha = fechaLocal(fechaHora);
         if (!fecha) continue;
 
-        const key = `${id}_${fecha}`;
-
-        if (!registros[key]) {
-            registros[key] = {
-                identificacion: id,
-                fecha,
-                nombre: nombreReg || id,
-                hora_entrada: "",
-                hora_salida: "",
-                metodo: item.metodo_validacion?.S || "",
-            };
-        }
-
-        if (nombreReg && nombreReg !== id) registros[key].nombre = nombreReg;
-        if (item.metodo_validacion?.S) registros[key].metodo = item.metodo_validacion.S;
-
-        if (tipo === "ENTRADA") {
-            // Con varias entradas en el día vale la primera.
-            if (!registros[key].hora_entrada || fechaHora < registros[key].hora_entrada) {
-                registros[key].hora_entrada = fechaHora;
-            }
-        } else if (tipo === "SALIDA") {
-            // Y de las salidas, la última.
-            if (!registros[key].hora_salida || fechaHora > registros[key].hora_salida) {
-                registros[key].hora_salida = fechaHora;
-            }
-        } else if (tipo === "EXITOSO" && !registros[key].hora_entrada) {
-            registros[key].hora_entrada = fechaHora;
-        }
+        eventos.push({
+            id, fechaHora, fecha, tipo,
+            nombre: item.nombre?.S || "",
+            metodo: item.metodo_validacion?.S || "",
+        });
     }
 
-    return Object.values(registros);
+    // El orden cronológico es lo que hace posible emparejar. Sin él una
+    // salida podría cerrar una entrada que todavía no había ocurrido.
+    eventos.sort((a, b) => a.fechaHora.localeCompare(b.fechaHora));
+
+    const visitas = [];
+    const abierta = new Map();   // identificación -> visita sin salida
+
+    const nueva = (ev, esEntrada) => {
+        const v = {
+            identificacion: ev.id,
+            fecha: ev.fecha,
+            nombre: ev.nombre || ev.id,
+            hora_entrada: esEntrada ? ev.fechaHora : "",
+            hora_salida: esEntrada ? "" : ev.fechaHora,
+            metodo: ev.metodo,
+        };
+        visitas.push(v);
+        return v;
+    };
+
+    for (const ev of eventos) {
+        if (ev.tipo === "SALIDA") {
+            const v = abierta.get(ev.id);
+            const aTiempo = v &&
+                new Date(ev.fechaHora) - new Date(v.hora_entrada) <= VENTANA_VISITA_MS;
+
+            if (aTiempo) {
+                v.hora_salida = ev.fechaHora;
+                if (ev.nombre && v.nombre === v.identificacion) v.nombre = ev.nombre;
+                if (ev.metodo) v.metodo = ev.metodo;
+                abierta.delete(ev.id);
+            } else {
+                // Una salida sin entrada no debería existir, porque el
+                // Lambda solo marca SALIDA cuando encuentra una entrada
+                // abierta. Si aparece, se muestra: esconderla ocultaría
+                // justo la señal de que algo falló.
+                nueva(ev, false);
+            }
+            continue;
+        }
+
+        // ENTRADA, y los registros viejos que solo traían EXITOSO.
+        //
+        // Si ya había una visita abierta de esta persona, se queda sin
+        // salida. Es lo correcto: olvidó marcarla, y el reporte tiene
+        // que decirlo en vez de inventar una hora.
+        abierta.set(ev.id, nueva(ev, true));
+    }
+
+    return visitas;
 }
 
 /**
