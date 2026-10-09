@@ -34,12 +34,12 @@ export const CANAL_HABEAS_DATA = 'biosecurityucompensar@gmail.com'
 const PUNTOS = [
   {
     titulo: 'Qué se guarda',
-    texto: 'Un vector matemático derivado de tu rostro, no la fotografía. Ese vector ' +
-      'es un conjunto de números del que no se puede reconstruir tu cara.',
+    texto: 'Un vector matemático derivado de su rostro, no la fotografía. Ese vector ' +
+      'es un conjunto de números del que no se puede reconstruir su cara.',
   },
   {
     titulo: 'Para qué',
-    texto: 'Únicamente para verificar tu identidad al entrar a las instalaciones. ' +
+    texto: 'Únicamente para verificar su identidad al entrar a las instalaciones. ' +
       'No se usa para evaluar desempeño, medir permanencia ni ninguna otra finalidad.',
   },
   {
@@ -50,23 +50,23 @@ const PUNTOS = [
   },
   {
     titulo: 'Por cuánto tiempo',
-    texto: 'Mientras mantengas tu vínculo con la institución. Al terminar, el registro ' +
+    texto: 'Mientras mantenga su vínculo con la institución. Al terminar, el registro ' +
       'pasa a retirados y el vector se elimina de la colección biométrica.',
   },
   {
     titulo: 'Tus derechos',
-    texto: 'Puedes conocer, actualizar, rectificar y revocar esta autorización cuando ' +
+    texto: 'Puede conocer, actualizar, rectificar y revocar esta autorización cuando ' +
       `quieras, sin dar explicaciones, escribiendo a ${CANAL_HABEAS_DATA}. ` +
-      'Si revocas, se elimina el dato biométrico y tu ingreso se gestiona por otro medio.',
+      'Si revoca, se elimina el dato biométrico y su ingreso se gestiona por otro medio.',
   },
   {
-    titulo: 'Si prefieres no autorizar',
+    titulo: 'Si prefiere no autorizar',
     // Antes esto prometía el ingreso con documento en portería. Lo
     // quitamos: la app no controla la entrada física y no puede
     // garantizar algo que depende de otra área. Queda lo que sí es
     // cierto y lo que la persona necesita saber para decidir.
-    texto: 'No estás obligado. Si no autorizas, no se registra tu rostro ni se guarda ' +
-      'ningún dato biométrico tuyo, y tu ingreso se gestiona por otro medio.',
+    texto: 'No está obligado. Si no autoriza, no se registra su rostro ni se guarda ' +
+      'ningún dato biométrico suyo, y su ingreso se gestiona por otro medio.',
   },
 ]
 
@@ -90,7 +90,7 @@ export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
             <h1 style={e.titulo}>Autorización de datos biométricos</h1>
             <p style={e.entrada}>
               {nombre ? <><strong style={e.nombre}>{nombre}</strong>, antes</> : 'Antes'} de
-              escanear tu rostro necesitamos tu permiso. Lee esto con calma; no hay prisa
+              escanear su rostro necesitamos su permiso. Lea esto con calma; no hay prisa
               y puedes decir que no.
             </p>
           </header>
@@ -114,7 +114,7 @@ export default function ConsentimientoDatos({ nombre, onAutoriza, onRechaza }) {
             <p style={e.marcoTexto}>
               El artículo 5 clasifica los datos biométricos como datos sensibles. El
               artículo 9 exige que su tratamiento cuente con autorización previa e
-              informada del titular. El artículo 8 reconoce tu derecho a conocer,
+              informada del titular. El artículo 8 reconoce su derecho a conocer,
               actualizar, rectificar y revocar lo que autorices, en cualquier momento.
             </p>
           </div>

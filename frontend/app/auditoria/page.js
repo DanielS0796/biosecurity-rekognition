@@ -110,7 +110,7 @@ export default function Auditoria() {
         setUsuarioActual(loginUser)
         cargarAuditoria()
       } else if (body.codigo === 0) {
-        setLoginError('Tu usuario no tiene permiso para este módulo')
+        setLoginError('Su usuario no tiene permiso para este módulo')
       } else {
         setLoginError(body.descripcion || 'Usuario o contraseña incorrectos')
       }
@@ -257,7 +257,7 @@ export default function Auditoria() {
   }
 
   async function solicitarCodigo() {
-    if (!resetEmail) { setResetErr('Ingresa tu usuario'); return }
+    if (!resetEmail) { setResetErr('Ingrese su usuario'); return }
     setResetLoading(true); setResetErr(''); setResetOk('')
     try {
       const r = await fetch(API_RESET, {
@@ -268,7 +268,7 @@ export default function Auditoria() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
-        setResetOk('Código enviado a tu correo')
+        setResetOk('Código enviado a su correo')
         setTimeout(() => { setResetPaso(2); setResetErr(''); setResetOk('') }, 1500)
       } else setResetErr(body.descripcion || 'Error al enviar código')
     } catch { setResetErr('Error de conexión') }
@@ -276,7 +276,7 @@ export default function Auditoria() {
   }
 
   async function verificarCodigo() {
-    if (!resetCodigo || resetCodigo.length !== 6) { setResetErr('Ingresa el código de 6 dígitos'); return }
+    if (!resetCodigo || resetCodigo.length !== 6) { setResetErr('Ingrese el código de 6 dígitos'); return }
     setResetLoading(true); setResetErr('')
     try {
       const r = await fetch(API_RESET, {
@@ -330,7 +330,7 @@ export default function Auditoria() {
           setUsuarioActual(usuario)
           cargarAuditoria()
         } else {
-          alert('Contraseña actualizada. Tu usuario no tiene permiso para este módulo.')
+          alert('Contraseña actualizada. Su usuario no tiene permiso para este módulo.')
         }
       }}
       onCancelar={() => { setCambioPendiente(null); setLoginPass('') }}
@@ -352,7 +352,6 @@ export default function Auditoria() {
         <div>
           <div style={{ ...cardStyle, borderRadius: '24px 24px 0 0', marginTop: -60 }}>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)', marginBottom: 4 }}>Acceso Administrativo</div>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 18 }}>Solo personal autorizado</div>
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Usuario</label>
               <input style={inputStyle} type="text" placeholder="Ingrese su usuario" value={loginUser} onChange={e => setLoginUser(e.target.value)} />
@@ -364,7 +363,7 @@ export default function Auditoria() {
             {loginError && <Aviso tipo="error" style={{ marginBottom: 10 }}>{loginError}</Aviso>}
             <button style={btnPrimary} onClick={login} disabled={loginLoading}>{loginLoading ? 'Verificando...' : 'Ingresar'}</button>
             <button onClick={() => { setResetModal(true); setResetPaso(1) }} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: '#4B2D8F', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
-              ¿Olvidaste tu contraseña?
+              ¿Olvidó su contraseña?
             </button>
           </div>
           <div style={{ background: 'var(--orange)', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -381,20 +380,20 @@ export default function Auditoria() {
               <div style={{ fontSize: 18, fontWeight: 800, color: '#1A2D5A' }}>Restablecer contraseña</div>
             </div>
             {resetPaso === 1 && <>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa tu usuario y te enviaremos un código al correo registrado.</p>
+              <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingrese su usuario y le enviaremos un código al correo registrado.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Usuario institucional</label><input style={inputStyle} type="text" placeholder="Usuario institucional" value={resetEmail} onChange={e => setResetEmail(e.target.value)} /></div>
               {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
               {resetOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{resetOk}</Aviso>}
               <button style={btnPrimary} onClick={solicitarCodigo} disabled={resetLoading}>{resetLoading ? 'Enviando…' : 'Enviar código'}</button>
             </>}
             {resetPaso === 2 && <>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa el código de 6 dígitos enviado a tu correo.</p>
+              <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingrese el código de 6 dígitos enviado a su correo.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Código</label><input style={{ ...inputStyle, letterSpacing: 8, fontSize: 20, textAlign: 'center' }} type="text" placeholder="000000" maxLength={6} value={resetCodigo} onChange={e => setResetCodigo(e.target.value)} /></div>
               {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
               <button style={btnPrimary} onClick={verificarCodigo} disabled={resetLoading}>{resetLoading ? 'Verificando…' : 'Verificar código'}</button>
             </>}
             {resetPaso === 3 && <>
-              <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa tu nueva contraseña.</p>
+              <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingrese su nueva contraseña.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nueva contraseña</label><input style={inputStyle} type="password" placeholder="••••••••" value={resetNueva} onChange={e => setResetNueva(e.target.value)} /></div>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Confirmar</label><input style={inputStyle} type="password" placeholder="••••••••" value={resetConfirmar} onChange={e => setResetConfirmar(e.target.value)} /></div>
               {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}

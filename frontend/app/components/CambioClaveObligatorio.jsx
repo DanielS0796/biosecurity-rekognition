@@ -78,7 +78,7 @@ export default function CambioClaveObligatorio({ usuario, claveActual, onListo, 
   return (
     <div style={e.fondo}>
       <div style={e.tarjeta}>
-        <div style={e.titulo}>Cambia tu contraseña</div>
+        <div style={e.titulo}>Cambie su contraseña</div>
         <p style={e.bajada}>
           Estás usando una contraseña temporal. Para continuar debes definir
           una propia.
@@ -111,7 +111,7 @@ export default function CambioClaveObligatorio({ usuario, claveActual, onListo, 
           ))}
           <li style={{ ...e.regla, color: nueva && !estado.contieneUsuario ? '#2e7d32' : '#888' }}>
             <span style={e.marca}>{nueva && !estado.contieneUsuario ? <Check size={14} aria-hidden="true" /> : <Dot size={14} aria-hidden="true" />}</span>
-            {' '}No contiene tu nombre de usuario
+            {' '}No contiene su nombre de usuario
           </li>
           <li style={{ ...e.regla, color: estado.coinciden ? '#2e7d32' : '#888' }}>
             <span style={e.marca}>{estado.coinciden ? <Check size={14} aria-hidden="true" /> : <Dot size={14} aria-hidden="true" />}</span> Las dos coinciden

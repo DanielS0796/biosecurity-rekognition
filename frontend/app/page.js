@@ -77,17 +77,12 @@ export default function Home() {
         {/* PANEL ACCESO */}
         <div style={{ flex: 1, padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ background: 'rgba(255,255,255,0.75)', borderRadius: 'var(--r-tarjeta)', padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: 'var(--sombra-flotante)', border: '1px solid rgba(255,255,255,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <div style={{ width: '100%', fontSize: 18, fontWeight: 800, color: 'var(--blue)', marginBottom: 4 }}>Control de Acceso</div>
-            <div style={{ width: '100%', fontSize: 13, color: '#666', marginBottom: 18 }}>
-              {escaneando ? 'Siga las instrucciones en pantalla' : 'Escaneo facial en vivo'}
-            </div>
+            <div style={{ width: '100%', fontSize: 18, fontWeight: 800, color: 'var(--blue)', marginBottom: 18 }}>Control de Acceso</div>
 
             {!escaneando && !resultado && (
               <>
                 <div style={{ width: '100%', marginBottom: 16, padding: 14, background: '#f0f4ff', borderRadius: 'var(--r-control)', borderLeft: '4px solid var(--blue)', fontSize: 12, color: '#333', lineHeight: 1.6 }}>
-                  Centre el rostro en el óvalo y sosténgalo unos segundos. El
-                  sistema comprueba que haya una persona real frente a la cámara,
-                  así que una fotografía no sirve.
+                  Centre el rostro en el óvalo y sosténgalo unos segundos.
                 </div>
                 <button onClick={abrirEscaneo} style={{ width: '100%', maxWidth: 320, padding: 16, border: 'none', borderRadius: 'var(--r-control)', background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: 'var(--sombra-accion)' }}>
                   Validar acceso
@@ -126,8 +121,8 @@ export default function Home() {
                 se está tratando y cómo salirse. El consentimiento se dio
                 una vez al registrarse; esto no lo repite, lo recuerda. */}
             <div style={{ width: '100%', marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(0,0,0,0.08)', fontSize: 11, color: '#777', lineHeight: 1.6, textAlign: 'center' }}>
-              Tus datos biométricos se tratan según la política que autorizaste al
-              registrarte. Para consultarla o revocar tu autorización, escribe a
+              Sus datos biométricos se tratan según la política que autorizó al
+              registrarse. Para consultarla o revocar su autorización, escriba a
               biosecurityucompensar@gmail.com
             </div>
           </div>
