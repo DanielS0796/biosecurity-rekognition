@@ -48,6 +48,19 @@ const TABLE_LIVENESS = process.env.TABLE_LIVENESS || "biosecurity-liveness-sessi
 const TABLE_EMPLEADOS = process.env.TABLE_EMPLEADOS || "biosecurity-empleados";
 const TABLE_RETIRADOS = process.env.TABLE_RETIRADOS || "biosecurity-retirados";
 const TABLE_ACCESOS = process.env.TABLE_ACCESOS || "biosecurity-accesos";
+
+// Cuánto hacia atrás se busca la entrada abierta de una persona.
+//
+// Antes se filtraba por día UTC, con begins_with sobre fecha_hora. En
+// Bogotá el día UTC cambia a las 7 de la noche: quien entraba a las 6 y
+// salía a las 8 quedaba con dos entradas, porque la salida buscaba en el
+// día siguiente y no encontraba la suya. Con clases nocturnas eso pasa
+// todos los días.
+//
+// Dieciocho horas es más que cualquier jornada y menos que un día, así
+// que una entrada que alguien olvidó cerrar ayer no se traga el escaneo
+// de hoy: ese vuelve a ser una entrada, como debe ser.
+const HORAS_VISITA_ABIERTA = 18;
 const COLLECTION_ID = process.env.COLLECTION_ID || "coleccion2anlusoft";
 const BUCKET_AUDITORIA = process.env.BUCKET_AUDITORIA || "";
 
@@ -523,7 +536,6 @@ async function registrarEmpleado({
  * ──────────────────────────────────────────────────────────── */
 async function validarAcceso({ sessionId, imagen, confianza }) {
     const fechaHora = new Date().toISOString();
-    const fecha = fechaHora.split("T")[0];
     const idAcceso = crypto.randomUUID();
 
     let busqueda;
@@ -589,17 +601,26 @@ async function validarAcceso({ sessionId, imagen, confianza }) {
 
     const nombre = empleado.Item.nombre?.S || identificacion;
 
-    // Si ya hay una ENTRADA abierta hoy, este escaneo es la SALIDA.
+    // Si esta persona tiene una ENTRADA sin cerrar, este escaneo es su
+    // SALIDA. Se busca por ventana de tiempo y no por día del calendario,
+    // porque el día UTC parte las visitas de la noche en dos.
+    const desde = new Date(
+        Date.now() - HORAS_VISITA_ABIERTA * 60 * 60 * 1000
+    ).toISOString();
+
     const abiertas = await dynamo.send(new QueryCommand({
         TableName: TABLE_ACCESOS,
         IndexName: "identificacion-fecha-index",
-        KeyConditionExpression: "identificacion = :id AND begins_with(fecha_hora, :fecha)",
+        KeyConditionExpression: "identificacion = :id AND fecha_hora >= :desde",
         FilterExpression: "tipo_acceso = :entrada AND attribute_not_exists(hora_salida)",
         ExpressionAttributeValues: {
             ":id": { S: identificacion },
-            ":fecha": { S: fecha },
+            ":desde": { S: desde },
             ":entrada": { S: "ENTRADA" },
         },
+        // Si hubiera más de una abierta, se cierra la más reciente. En
+        // orden ascendente se habría cerrado la más vieja.
+        ScanIndexForward: false,
     }));
 
     let tipoAcceso = "ENTRADA";

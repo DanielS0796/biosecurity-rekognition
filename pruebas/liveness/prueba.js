@@ -289,6 +289,69 @@ await post('/liveness-init', {
 check('sin tipo también cae en estudiante',
   dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-vacio']?.tipo_persona?.S === 'estudiante');
 
+console.log('\n── Entrada y salida se alternan ──');
+// Esta lógica nunca se había probado: el doble de DynamoDB contestaba
+// { Items: [] } a toda consulta, así que el Lambda siempre creía que no
+// había entradas abiertas y toda prueba daba ENTRADA.
+
+// Un escaneo completo de una persona ya registrada, en el momento que se
+// le indique. El reloj se finge porque la decisión entrada/salida depende
+// de la fecha, y de noche en Bogotá esa fecha no es la que uno cree.
+async function escanear(sesion, momentoISO) {
+  const Real = Date;
+  if (momentoISO) {
+    global.Date = class extends Real {
+      constructor(...a) { return a.length ? new Real(...a) : new Real(momentoISO); }
+      static now() { return new Real(momentoISO).getTime(); }
+    };
+  }
+  try {
+    rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: sesion };
+    await post('/liveness-init', { proposito: 'validacion' });
+    rek.__estado.respuestas.GetFaceLivenessSessionResultsCommand = {
+      Status: 'SUCCEEDED', Confidence: 97, ReferenceImage: { Bytes: Buffer.from('img') } };
+    rek.__estado.respuestas.SearchFacesByImageCommand = {
+      FaceMatches: [{ Similarity: 99.1, Face: { ExternalImageId: '123', FaceId: 'f1' } }] };
+    return await post('/liveness-result', { session_id: sesion });
+  } finally {
+    global.Date = Real;
+  }
+}
+
+const limpiarAccesos = () => { dyn.__estado.tablas['biosecurity-accesos'] = {}; };
+const conPersona = () => {
+  dyn.__estado.tablas['biosecurity-empleados'] = {
+    '123': { identificacion: { S: '123' }, nombre: { S: 'Ana Gómez' } } };
+};
+
+reset(); limpiarAccesos(); conPersona();
+// 13:00, 14:00 y 15:00 UTC son 08:00, 09:00 y 10:00 en Bogotá.
+let e1 = await escanear('s-e1', '2026-10-06T13:00:00Z');
+let e2 = await escanear('s-e2', '2026-10-06T14:00:00Z');
+let e3 = await escanear('s-e3', '2026-10-06T15:00:00Z');
+check('el primero es entrada', e1.body.tipo_acceso === 'ENTRADA', e1.body.tipo_acceso);
+check('el segundo es salida', e2.body.tipo_acceso === 'SALIDA', e2.body.tipo_acceso);
+check('el tercero vuelve a ser entrada', e3.body.tipo_acceso === 'ENTRADA', e3.body.tipo_acceso);
+
+console.log('\n── Una visita de noche no se parte en dos entradas ──');
+// En Bogotá el día UTC cambia a las 7 de la noche. Quien entra a las 6
+// y sale a las 8 cruza esa frontera sin salir del mismo día real. La
+// consulta filtraba por día UTC, así que la salida no encontraba su
+// entrada y quedaba registrada como una segunda entrada.
+reset(); limpiarAccesos(); conPersona();
+const entrada = await escanear('s-n1', '2026-10-06T23:00:00Z');  // 18:00 Bogotá
+const salida  = await escanear('s-n2', '2026-10-07T01:00:00Z');  // 20:00 Bogotá
+check('entra', entrada.body.tipo_acceso === 'ENTRADA', entrada.body.tipo_acceso);
+check('y sale, no entra otra vez', salida.body.tipo_acceso === 'SALIDA', salida.body.tipo_acceso);
+
+console.log('\n── Una entrada olvidada ayer no se cierra hoy ──');
+// Quien no marcó su salida deja una entrada abierta. El escaneo del día
+// siguiente es una entrada nueva, no la salida de aquella.
+reset(); limpiarAccesos(); conPersona();
+await escanear('s-v1', '2026-10-06T13:00:00Z');
+const hoy = await escanear('s-v2', '2026-10-08T13:00:00Z');
+check('dos días después vuelve a ser entrada', hoy.body.tipo_acceso === 'ENTRADA', hoy.body.tipo_acceso);
+
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();
