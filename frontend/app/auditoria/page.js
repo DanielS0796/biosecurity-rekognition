@@ -545,30 +545,36 @@ export default function Auditoria() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Identificación', 'Nombre', 'Vínculo', 'Fecha entrada', 'Hora entrada', 'Fecha salida', 'Hora salida', 'Tiempo'].map((h, i, arr) => (
+                        {['Identificación', 'Nombre', 'Vínculo', 'Entrada', 'Salida', 'Tiempo'].map((h, i, arr) => (
                           <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {visibles.map((item, i) => {
-                        // Una visita que cruzó la medianoche tiene dos
-                        // fechas distintas. Se resalta para que nadie lea
-                        // la hora de salida como si fuera del mismo día.
+                        // La fecha de salida se muestra siempre, aunque
+                        // repita la de entrada: antes solo aparecía cuando
+                        // era distinta y eso obligaba a conocer la regla
+                        // para leer la tabla. Cuando sí difiere va en rojo,
+                        // porque esa visita cruzó la medianoche.
                         const otroDia = item.fecha_salida && item.fecha_salida !== item.fecha_entrada
                         return (
                         <tr key={i}>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontWeight: 700 }}>{item.identificacion || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>{item.nombre || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#666' }}>{vinculoLegible(item.tipo_persona) || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{item.fecha_entrada || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#2e7d32', fontWeight: 600, whiteSpace: 'nowrap' }}>{item.hora_entrada || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap', color: otroDia ? '#c62828' : '#444', fontWeight: otroDia ? 700 : 400 }}>
-                            {item.fecha_salida || '-'}
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: '#2e7d32', fontWeight: 600 }}>{item.hora_entrada || '-'}</div>
+                            <div style={{ fontSize: 11, color: '#999' }}>{item.fecha_entrada || ''}</div>
                           </td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>
                             {item.hora_salida
-                              ? <span style={{ color: '#c62828', fontWeight: 600 }}>{item.hora_salida}</span>
+                              ? <>
+                                  <div style={{ color: '#c62828', fontWeight: 600 }}>{item.hora_salida}</div>
+                                  <div style={{ fontSize: 11, color: otroDia ? '#c62828' : '#999', fontWeight: otroDia ? 700 : 400 }}>
+                                    {item.fecha_salida || ''}
+                                  </div>
+                                </>
                               : <span style={{ background: '#fff3e0', color: '#e65100', border: '1px solid #ffb74d', borderRadius: 20, padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
                                   Sin salida
                                 </span>}
