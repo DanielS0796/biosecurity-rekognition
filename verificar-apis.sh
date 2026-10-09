@@ -115,31 +115,15 @@ probar "h1jhziuxw4  liveness-init" POST \
   "https://h1jhziuxw4.execute-api.us-east-1.amazonaws.com/prod/liveness-init" \
   "" '{"proposito":"validacion"}'
 
-# ── La puerta vieja ──────────────────────────────────────────────────
-# /best/validar recibe una fotografía en el cuerpo y registra el acceso
-# sin comprobar que haya una persona real delante: una foto impresa lo
-# supera. Es el agujero que motivó todo el cambio a liveness.
+# La puerta vieja ya no está. El API anlusoft-rekognition-api se retiró
+# de AWS el 8 de octubre de 2026 y se borró del Terraform el mismo día.
 #
-# Se quitó del frontend, pero Terraform todavía declara el API y el
-# Lambda sigue ahí. Si esta línea contesta algo distinto de 403, la
-# puerta sigue abierta para quien conozca la URL, aunque la aplicación
-# ya no la use.
-#
-# Acá un 403 es la respuesta buena. La etiqueta no dice 'terraform' a
-# propósito: migrar-config.sh mira esas líneas para decidir, y esta no
-# debe bloquear la migración.
-echo
-echo "Puerta vieja de validación (debe estar cerrada: se espera 403)"
-CODIGO_VIEJO=$(curl -s -o /tmp/vieja.$$ -w '%{http_code}' --max-time 20 \
-  -X POST -H 'Content-Type: application/json' -d '{}' \
-  "https://8dwk5nueaa.execute-api.us-east-1.amazonaws.com/best/validar")
-if [ "$CODIGO_VIEJO" = "403" ] || [ "$CODIGO_VIEJO" = "404" ]; then
-  printf '  %s %-34s %s\n' "✓" "8dwk5nueaa  /best/validar" "$CODIGO_VIEJO"
-else
-  printf '  %s %-34s %s  %s\n' "⚠" "8dwk5nueaa  /best/validar" "$CODIGO_VIEJO" \
-    "ABIERTA — acepta fotos sin liveness"
-fi
-rm -f /tmp/vieja.$$
+# Acá había una prueba que llamaba su URL esperando un 403. Se quitó
+# porque dejó de significar algo: comprobaba un ID de API que ya no
+# existe, y si Terraform volviera a crear ese endpoint tendría un ID
+# nuevo y la prueba seguiría en verde. Lo que sí vigila que no vuelva es
+# pruebas/validar-retirado/prueba.js, que mira el Terraform en vez de la
+# red y corre en cada despliegue.
 
 echo
 echo "Preflight CORS de los APIs de Terraform"

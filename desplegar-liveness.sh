@@ -87,11 +87,13 @@ echo "────────────────────────�
 echo " Comprobaciones antes de tocar AWS"
 echo "──────────────────────────────────────────────────"
 
-# Dos cosas que los dobles de las pruebas no pueden ver, porque no son
-# AWS: que cada Lambda tenga los permisos de IAM que su código usa, y
-# que su zip lleve las dependencias que su código importa. Las dos ya
-# rompieron producción una vez.
-for comprobacion in pruebas/permisos/prueba.js pruebas/empaquetado/prueba.js; do
+# Tres cosas que los dobles de las pruebas no pueden ver, porque no son
+# AWS: que cada Lambda tenga los permisos de IAM que su código usa, que
+# su zip lleve las dependencias que su código importa, y que nadie haya
+# vuelto a declarar el endpoint que registraba accesos con una
+# fotografía. Las tres ya pasaron de verdad.
+for comprobacion in pruebas/permisos/prueba.js pruebas/empaquetado/prueba.js \
+                    pruebas/validar-retirado/prueba.js; do
   if [ -f "$comprobacion" ]; then
     if ! node "$comprobacion"; then
       echo "Se detiene antes de aplicar. Revisa lo de arriba."

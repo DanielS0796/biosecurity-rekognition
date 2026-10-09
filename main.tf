@@ -355,90 +355,30 @@ resource "aws_lambda_function" "auditoria" {
 }
 
 # ─────────────────────────────────────────
-# API Gateway validacion (publico)
+# Aquí vivía /best/validar
 # ─────────────────────────────────────────
-resource "aws_api_gateway_rest_api" "api" {
-  name        = "anlusoft-rekognition-api"
-  description = "API para validacion biometrica"
-}
-
-resource "aws_api_gateway_resource" "root" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  parent_id   = aws_api_gateway_rest_api.api.root_resource_id
-  path_part   = "validar"
-}
-
-resource "aws_api_gateway_method" "post" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.root.id
-  http_method   = "POST"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "lambda" {
-  rest_api_id             = aws_api_gateway_rest_api.api.id
-  resource_id             = aws_api_gateway_resource.root.id
-  http_method             = aws_api_gateway_method.post.http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.validacion_biometrica.invoke_arn
-}
-
-resource "aws_api_gateway_method" "options" {
-  rest_api_id   = aws_api_gateway_rest_api.api.id
-  resource_id   = aws_api_gateway_resource.root.id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.root.id
-  http_method = aws_api_gateway_method.options.http_method
-  type        = "MOCK"
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options_200" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.root.id
-  http_method = aws_api_gateway_method.options.http_method
-  status_code = "200"
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options" {
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  resource_id = aws_api_gateway_resource.root.id
-  http_method = aws_api_gateway_method.options.http_method
-  status_code = "200"
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
-    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
-  }
-  depends_on = [aws_api_gateway_integration.options]
-}
-
-resource "aws_api_gateway_deployment" "deployment" {
-  depends_on  = [aws_api_gateway_integration.lambda, aws_api_gateway_integration.options]
-  rest_api_id = aws_api_gateway_rest_api.api.id
-  stage_name  = "best"
-}
-
-resource "aws_lambda_permission" "apigw" {
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.validacion_biometrica.function_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.api.execution_arn}/*/*"
-}
+# El API anlusoft-rekognition-api recibía una fotografía en el cuerpo
+# del JSON y registraba el acceso sin comprobar que hubiera una persona
+# real delante. Una foto impresa o en la pantalla de un celular lo
+# superaba. Es el agujero que motivó pasar el acceso a Rekognition Face
+# Liveness, donde la imagen que se compara es la que entrega el servicio
+# después de verificar la presencia, no una que mande el navegador.
+#
+# Se quitó del frontend, se retiró de AWS el 8 de octubre de 2026 y se
+# borra de acá el mismo día. Las tres cosas hacían falta: mientras
+# siguiera declarado, un apply sin -target lo recreaba. No es una
+# suposición, ya pasó: el API que se retiró tenía fecha de creación del
+# 7 de octubre, o sea que un apply nuestro lo había vuelto a levantar.
+#
+# El Lambda validacionderostros se queda, sin ninguna puerta desde
+# internet. Sirve para demostrar el comportamiento viejo en una prueba
+# controlada, invocándolo directamente, sin tener un endpoint público
+# abierto mientras se prepara esa demostración.
+#
+# Queda un cabo en AWS que Terraform ya no maneja: la sentencia
+# AllowAPIGatewayInvoke en la política del Lambda, que apunta al API que
+# ya no existe. Es inofensiva —ningún API puede coincidir con ese ARN— y
+# se borra a mano cuando se limpien las otras sentencias viejas.
 
 # ─────────────────────────────────────────
 # API Gateway RRHH (protegido)
