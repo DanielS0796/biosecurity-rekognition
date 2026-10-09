@@ -618,8 +618,20 @@ resource "aws_api_gateway_usage_plan_key" "rrhh_plan_key" {
   usage_plan_id = aws_api_gateway_usage_plan.rrhh_plan.id
 }
 
+# El identificador lleva sufijo -tf a propósito. En los Lambdas ya hay
+# una sentencia con el nombre sin sufijo, puesta a mano en abril, y
+# apunta al API de abril: por eso AddPermission daba 409 y, al mismo
+# tiempo, el API nuevo devolvía 500 —la sentencia existía, pero no
+# autorizaba a este API a invocar la función—.
+#
+# Importar la vieja y dejar que Terraform la reemplace le quitaría el
+# permiso al API que hoy sirve producción. Así que se añade una segunda
+# sentencia en vez de tocar la primera: durante la convivencia los dos
+# APIs pueden invocar el Lambda, que es justo lo que se necesita para
+# poder volver atrás. Las sentencias viejas se borran el día que se
+# borren los APIs de abril.
 resource "aws_lambda_permission" "apigw_rrhh" {
-  statement_id  = "AllowAPIGatewayInvokeRRHH"
+  statement_id  = "AllowAPIGatewayInvokeRRHHtf"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.registrar_empleado.function_name
   principal     = "apigateway.amazonaws.com"
@@ -750,7 +762,7 @@ resource "aws_api_gateway_usage_plan_key" "auditoria_plan_key" {
 }
 
 resource "aws_lambda_permission" "apigw_auditoria" {
-  statement_id  = "AllowAPIGatewayInvokeAuditoria"
+  statement_id  = "AllowAPIGatewayInvokeAuditoriatf"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.auditoria.function_name
   principal     = "apigateway.amazonaws.com"
@@ -1115,7 +1127,7 @@ resource "aws_api_gateway_deployment" "reset_deployment" {
 }
 
 resource "aws_lambda_permission" "apigw_reset" {
-  statement_id  = "AllowAPIGatewayInvokeReset"
+  statement_id  = "AllowAPIGatewayInvokeResettf"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.reset.function_name
   principal     = "apigateway.amazonaws.com"
