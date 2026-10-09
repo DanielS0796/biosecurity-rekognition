@@ -884,11 +884,6 @@ resource "aws_cognito_user_pool_client" "biosecurity_client" {
 # ─────────────────────────────────────────
 # Outputs
 # ─────────────────────────────────────────
-output "api_url" {
-  value       = "https://${aws_api_gateway_rest_api.api.id}.execute-api.us-east-1.amazonaws.com/best/validar"
-  description = "URL validacion biometrica"
-}
-
 output "api_rrhh_url" {
   value       = "https://${aws_api_gateway_rest_api.api_rrhh.id}.execute-api.us-east-1.amazonaws.com/prod/registrar"
   description = "URL registro RRHH"
