@@ -471,10 +471,123 @@ resource "aws_api_gateway_integration" "rrhh_lambda" {
   uri                     = aws_lambda_function.registrar_empleado.invoke_arn
 }
 
+# El frontend consulta este API con GET (activos, retirados y búsqueda
+# por cédula) y borra con DELETE. Hasta ahora Terraform solo declaraba
+# POST, así que este API nunca pudo servir la aplicación: por eso
+# producción siguió usando el API creado a mano en abril.
+resource "aws_api_gateway_method" "rrhh_get" {
+  rest_api_id      = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id      = aws_api_gateway_resource.rrhh_root.id
+  http_method      = "GET"
+  authorization    = "NONE"
+  api_key_required = true
+}
+
+resource "aws_api_gateway_integration" "rrhh_get" {
+  rest_api_id             = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id             = aws_api_gateway_resource.rrhh_root.id
+  http_method             = aws_api_gateway_method.rrhh_get.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.registrar_empleado.invoke_arn
+}
+
+resource "aws_api_gateway_method" "rrhh_delete" {
+  rest_api_id      = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id      = aws_api_gateway_resource.rrhh_root.id
+  http_method      = "DELETE"
+  authorization    = "NONE"
+  api_key_required = true
+}
+
+resource "aws_api_gateway_integration" "rrhh_delete" {
+  rest_api_id             = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id             = aws_api_gateway_resource.rrhh_root.id
+  http_method             = aws_api_gateway_method.rrhh_delete.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.registrar_empleado.invoke_arn
+}
+
+# El navegador manda x-api-key, que no es una cabecera simple, así que
+# toda petición va precedida de un preflight OPTIONS. Sin esto el
+# navegador bloquea la respuesta aunque el Lambda conteste bien.
+resource "aws_api_gateway_method" "rrhh_options" {
+  rest_api_id   = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id   = aws_api_gateway_resource.rrhh_root.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "rrhh_options" {
+  rest_api_id = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id = aws_api_gateway_resource.rrhh_root.id
+  http_method = aws_api_gateway_method.rrhh_options.http_method
+  type        = "MOCK"
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "rrhh_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id = aws_api_gateway_resource.rrhh_root.id
+  http_method = aws_api_gateway_method.rrhh_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "rrhh_options" {
+  rest_api_id = aws_api_gateway_rest_api.api_rrhh.id
+  resource_id = aws_api_gateway_resource.rrhh_root.id
+  http_method = aws_api_gateway_method.rrhh_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+  depends_on = [aws_api_gateway_integration.rrhh_options]
+}
+
 resource "aws_api_gateway_deployment" "rrhh_deployment" {
-  depends_on  = [aws_api_gateway_integration.rrhh_lambda]
   rest_api_id = aws_api_gateway_rest_api.api_rrhh.id
   stage_name  = "prod"
+
+  # Sin triggers, el despliegue se crea una vez y nunca se vuelve a
+  # publicar: la etapa sigue sirviendo una foto vieja aunque cambien los
+  # métodos. Es la razón por la que estos APIs respondían 403.
+  #
+  # No lleva create_before_destroy a propósito. Con stage_name en línea,
+  # crear primero el reemplazo choca con la etapa 'prod' que ya existe.
+  # El API de liveness, el único de este juego que ya sirve producción,
+  # usa triggers sin create_before_destroy y funciona; se iguala eso.
+  triggers = {
+    redespliegue = sha1(jsonencode([
+      aws_api_gateway_resource.rrhh_root,
+      aws_api_gateway_method.rrhh_post,
+      aws_api_gateway_integration.rrhh_lambda,
+      aws_api_gateway_method.rrhh_get,
+      aws_api_gateway_integration.rrhh_get,
+      aws_api_gateway_method.rrhh_delete,
+      aws_api_gateway_integration.rrhh_delete,
+      aws_api_gateway_method.rrhh_options,
+      aws_api_gateway_integration.rrhh_options,
+      aws_api_gateway_integration_response.rrhh_options,
+    ]))
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.rrhh_lambda,
+    aws_api_gateway_integration.rrhh_get,
+    aws_api_gateway_integration.rrhh_delete,
+    aws_api_gateway_integration.rrhh_options,
+    aws_api_gateway_integration_response.rrhh_options,
+  ]
 }
 
 resource "aws_api_gateway_api_key" "rrhh_key" {
@@ -535,10 +648,68 @@ resource "aws_api_gateway_integration" "auditoria_lambda" {
   uri                     = aws_lambda_function.auditoria.invoke_arn
 }
 
+resource "aws_api_gateway_method" "auditoria_options" {
+  rest_api_id   = aws_api_gateway_rest_api.api_auditoria.id
+  resource_id   = aws_api_gateway_resource.auditoria_root.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "auditoria_options" {
+  rest_api_id = aws_api_gateway_rest_api.api_auditoria.id
+  resource_id = aws_api_gateway_resource.auditoria_root.id
+  http_method = aws_api_gateway_method.auditoria_options.http_method
+  type        = "MOCK"
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "auditoria_options_200" {
+  rest_api_id = aws_api_gateway_rest_api.api_auditoria.id
+  resource_id = aws_api_gateway_resource.auditoria_root.id
+  http_method = aws_api_gateway_method.auditoria_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+}
+
+resource "aws_api_gateway_integration_response" "auditoria_options" {
+  rest_api_id = aws_api_gateway_rest_api.api_auditoria.id
+  resource_id = aws_api_gateway_resource.auditoria_root.id
+  http_method = aws_api_gateway_method.auditoria_options.http_method
+  status_code = "200"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+  depends_on = [aws_api_gateway_integration.auditoria_options]
+}
+
 resource "aws_api_gateway_deployment" "auditoria_deployment" {
-  depends_on  = [aws_api_gateway_integration.auditoria_lambda]
   rest_api_id = aws_api_gateway_rest_api.api_auditoria.id
   stage_name  = "prod"
+
+  triggers = {
+    redespliegue = sha1(jsonencode([
+      aws_api_gateway_resource.auditoria_root,
+      aws_api_gateway_method.auditoria_get,
+      aws_api_gateway_integration.auditoria_lambda,
+      aws_api_gateway_method.auditoria_options,
+      aws_api_gateway_integration.auditoria_options,
+      aws_api_gateway_integration_response.auditoria_options,
+    ]))
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.auditoria_lambda,
+    aws_api_gateway_integration.auditoria_options,
+    aws_api_gateway_integration_response.auditoria_options,
+  ]
 }
 
 resource "aws_api_gateway_api_key" "auditoria_key" {
@@ -895,9 +1066,25 @@ resource "aws_api_gateway_integration_response" "reset_options" {
 }
 
 resource "aws_api_gateway_deployment" "reset_deployment" {
-  depends_on  = [aws_api_gateway_integration.reset_lambda, aws_api_gateway_integration.reset_options]
   rest_api_id = aws_api_gateway_rest_api.api_reset.id
   stage_name  = "prod"
+
+  triggers = {
+    redespliegue = sha1(jsonencode([
+      aws_api_gateway_resource.reset_root,
+      aws_api_gateway_method.reset_post,
+      aws_api_gateway_integration.reset_lambda,
+      aws_api_gateway_method.reset_options,
+      aws_api_gateway_integration.reset_options,
+      aws_api_gateway_integration_response.reset_options,
+    ]))
+  }
+
+  depends_on = [
+    aws_api_gateway_integration.reset_lambda,
+    aws_api_gateway_integration.reset_options,
+    aws_api_gateway_integration_response.reset_options,
+  ]
 }
 
 resource "aws_lambda_permission" "apigw_reset" {

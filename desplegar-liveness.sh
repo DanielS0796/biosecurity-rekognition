@@ -187,6 +187,13 @@ terraform apply -auto-approve \
   -target=aws_lambda_function.registrar_empleado \
   -target=aws_lambda_function.validacion_biometrica \
   -target=aws_lambda_function.liveness \
+  -target=aws_api_gateway_deployment.rrhh_deployment \
+  -target=aws_api_gateway_deployment.auditoria_deployment \
+  -target=aws_api_gateway_deployment.reset_deployment \
+  -target=aws_api_gateway_usage_plan.rrhh_plan \
+  -target=aws_api_gateway_usage_plan.auditoria_plan \
+  -target=aws_api_gateway_usage_plan_key.rrhh_plan_key \
+  -target=aws_api_gateway_usage_plan_key.auditoria_plan_key \
   -target=aws_iam_role_policy.lambda_liveness_policy \
   -target=aws_iam_role_policy.lambda_reset_policy \
   -target=aws_iam_role_policy.lambda_dynamo_policy \
