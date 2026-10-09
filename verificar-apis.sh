@@ -58,6 +58,29 @@ probar() {
   rm -f /tmp/respuesta.$$
 }
 
+# El navegador nunca manda la petición de verdad si el preflight falla.
+# Esto es lo que rompía auditoría: el Lambda contestaba bien y el
+# navegador descartaba la respuesta sin mostrarla.
+probar_preflight() {
+  local etiqueta="$1" url="$2" metodos
+  local codigo
+
+  codigo=$(curl -s -o /dev/null -D /tmp/cab.$$ -w '%{http_code}' --max-time 20 \
+    -X OPTIONS \
+    -H 'Origin: https://biosecurity.example' \
+    -H 'Access-Control-Request-Method: GET' \
+    -H 'Access-Control-Request-Headers: x-api-key' "$url")
+
+  metodos=$(grep -i '^access-control-allow-methods:' /tmp/cab.$$ \
+    | tr -d '\r' | cut -d' ' -f2-)
+
+  local marca="✗"
+  [ "$codigo" = "200" ] && [ -n "$metodos" ] && marca="✓"
+
+  printf '  %s %-34s %s  %s\n' "$marca" "$etiqueta" "$codigo" "${metodos:-sin cabecera Allow-Methods}"
+  rm -f /tmp/cab.$$
+}
+
 echo "Registro de personas"
 probar "produccion  uadjcukyx1" GET \
   "https://uadjcukyx1.execute-api.us-east-1.amazonaws.com/prod/registrar?tipo=activos" \
@@ -93,8 +116,17 @@ probar "h1jhziuxw4  liveness-init" POST \
   "" '{"proposito":"validacion"}'
 
 echo
+echo "Preflight CORS de los APIs de Terraform"
+probar_preflight "terraform   jfshekzwbl" \
+  "https://jfshekzwbl.execute-api.us-east-1.amazonaws.com/prod/registrar"
+probar_preflight "terraform   sdvymkutn7" \
+  "https://sdvymkutn7.execute-api.us-east-1.amazonaws.com/prod/reporte"
+probar_preflight "terraform   qwnsrgtar9" \
+  "https://qwnsrgtar9.execute-api.us-east-1.amazonaws.com/prod/reset"
+
+echo
 echo "──────────────────────────────────────────────────"
-echo "Si las cuatro líneas 'terraform' dan 200, el cambio de config.js"
-echo "es seguro. Si alguna falla, el número y el mensaje dicen qué le"
-echo "falta a ese API antes de poder migrar."
+echo "Si las tres líneas 'terraform' de arriba dan 200 y los tres"
+echo "preflight también, el cambio de config.js es seguro. Si alguna"
+echo "falla, el número y el mensaje dicen qué le falta a ese API."
 echo "──────────────────────────────────────────────────"
