@@ -33,3 +33,27 @@ body {
 .amplify-liveness-start-screen-camera-select__container {
   display: none !important;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Indicador de espera
+   ─────────────────────────────────────────────────────────────
+   Antes los estados de carga se marcaban con el emoji del reloj de
+   arena. Un emoji lo dibuja el sistema operativo, así que el mismo
+   aviso se veía distinto en cada equipo, y además está quieto: no
+   distingue "trabajando" de "colgado".
+
+   El icono de Lucide gira con esto. Se respeta a quien pidió menos
+   movimiento en su sistema: la animación es una comodidad, no
+   información, y para alguien con sensibilidad vestibular puede ser
+   bastante peor que una comodidad. */
+@keyframes girar {
+  to { transform: rotate(360deg); }
+}
+
+.girando {
+  animation: girar 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girando { animation: none; }
+}

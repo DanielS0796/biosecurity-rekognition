@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import LivenessScan from './components/LivenessScan'
+import { BarChart3, ScanFace, Users } from 'lucide-react'
 
 export default function Home() {
   // El control de acceso va por escaneo de persona viva. Antes se capturaba
@@ -72,13 +73,13 @@ export default function Home() {
         {/* NAVBAR */}
         <div style={{ display: 'flex', gap: 6, padding: '14px 16px 0' }}>
           <button style={{ flex: 1, padding: '10px 6px', border: '1.5px solid var(--orange)', borderRadius: 12, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 18 }}>🔐</span><span>Acceso</span>
+            <ScanFace size={18} aria-hidden="true" /><span>Acceso</span>
           </button>
           <Link href="/rrhh" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-            <span style={{ fontSize: 18 }}>👥</span><span>Registro</span>
+            <Users size={18} aria-hidden="true" /><span>Registro</span>
           </Link>
           <Link href="/auditoria" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-            <span style={{ fontSize: 18 }}>📊</span><span>Auditoría</span>
+            <BarChart3 size={18} aria-hidden="true" /><span>Auditoría</span>
           </Link>
         </div>
 

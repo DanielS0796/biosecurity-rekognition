@@ -6,6 +6,8 @@ import { API_RRHH_URL, API_RESET, API_KEY_RRHH } from '../config'
 import LivenessScan from '../components/LivenessScan'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 import ConsentimientoDatos from '../components/ConsentimientoDatos'
+import { ArrowLeft, BarChart3, Check, DoorOpen, LoaderCircle, ScanFace, Search, ShieldCheck, Trash2, TriangleAlert, UserCog, UserPlus, Users } from 'lucide-react'
+import Aviso from '../components/Aviso'
 
 // Vínculo de la persona con la institución. Es una universidad: quien
 // entra puede no ser empleado de nadie. El orden es por frecuencia
@@ -127,7 +129,7 @@ export default function RRHH() {
         setLoginError(body.descripcion || 'Usuario o contraseña incorrectos')
       }
     } catch {
-      setLoginError('⚠️ Error de conexión')
+      setLoginError('Error de conexión')
     }
     setLoginLoading(false)
   }
@@ -218,7 +220,7 @@ export default function RRHH() {
         alerta(setElimErr, 'No se encontró a nadie con esa identificación')
       }
     } catch {
-      alerta(setElimErr, '⚠️ Error de conexión')
+      alerta(setElimErr, 'Error de conexión')
     }
     setBuscarLoading(false)
   }
@@ -236,14 +238,14 @@ export default function RRHH() {
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
         playSound('success')
-        alerta(setElimOk, `✅ ${body.descripcion}`)
+        alerta(setElimOk, body.descripcion)
         setEliminarId('')
       } else {
         playSound('error')
         alerta(setElimErr, body.descripcion || 'Error al eliminar')
       }
     } catch {
-      alerta(setElimErr, '⚠️ Error de conexión')
+      alerta(setElimErr, 'Error de conexión')
     }
     setElimLoading(false)
   }
@@ -310,7 +312,7 @@ export default function RRHH() {
         alerta(setCrearErr, body.descripcion || 'Error al crear usuario')
       }
     } catch {
-      alerta(setCrearErr, '⚠️ Error de conexión')
+      alerta(setCrearErr, 'Error de conexión')
     }
     setCrearLoading(false)
   }
@@ -349,7 +351,7 @@ export default function RRHH() {
         alerta(setCrearErr, body.descripcion || 'No se pudieron cambiar los permisos')
       }
     } catch {
-      alerta(setCrearErr, '⚠️ Error de conexión')
+      alerta(setCrearErr, 'Error de conexión')
     }
     setGuardandoRoles(null)
   }
@@ -386,7 +388,7 @@ export default function RRHH() {
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) { playSound('success'); cargarUsuarios() }
       else { playSound('error'); alert(body.descripcion || 'Error al eliminar') }
-    } catch { alert('⚠️ Error de conexión') }
+    } catch { alert('Error de conexión') }
   }
 
   async function solicitarCodigo() {
@@ -401,10 +403,10 @@ export default function RRHH() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
-        setResetOk('✅ Código enviado a tu correo')
+        setResetOk('Código enviado a tu correo')
         setTimeout(() => { setResetPaso(2); setResetErr(''); setResetOk('') }, 1500)
       } else setResetErr(body.descripcion || 'Error al enviar código')
-    } catch { setResetErr('⚠️ Error de conexión') }
+    } catch { setResetErr('Error de conexión') }
     setResetLoading(false)
   }
 
@@ -421,7 +423,7 @@ export default function RRHH() {
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) { setResetPaso(3); setResetErr('') }
       else setResetErr(body.descripcion || 'Código incorrecto')
-    } catch { setResetErr('⚠️ Error de conexión') }
+    } catch { setResetErr('Error de conexión') }
     setResetLoading(false)
   }
 
@@ -438,10 +440,10 @@ export default function RRHH() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
-        setResetOk('✅ Contraseña actualizada')
+        setResetOk('Contraseña actualizada')
         setTimeout(() => { setResetModal(false); setResetPaso(1) }, 2000)
       } else setResetErr(body.descripcion || 'Error al cambiar contraseña')
-    } catch { setResetErr('⚠️ Error de conexión') }
+    } catch { setResetErr('Error de conexión') }
     setResetLoading(false)
   }
 
@@ -449,8 +451,6 @@ export default function RRHH() {
   const inputStyle = { width: '100%', padding: '13px 16px', border: '2px solid #e8e8e8', borderRadius: 12, fontFamily: 'Nunito, sans-serif', fontSize: 15, outline: 'none', background: '#fafafa' }
   const btnPrimary = { width: '100%', padding: 16, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 15px rgba(240,90,34,0.35)' }
   const btnSecondary = { width: '100%', padding: 14, border: '2px solid var(--blue)', borderRadius: 14, background: 'transparent', color: 'var(--blue)', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }
-  const alertOk = { padding: '12px 16px', borderRadius: 12, fontSize: 14, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', border: '2px solid #2e7d32' }
-  const alertErr = { padding: '12px 16px', borderRadius: 12, fontSize: 14, fontWeight: 700, background: '#fdecea', color: '#c62828', border: '2px solid #c62828' }
 
   const Fondo = () => (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
@@ -490,7 +490,7 @@ export default function RRHH() {
       <Fondo />
       <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div style={{ padding: '40px 20px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer', textDecoration: 'none' }}>← Volver</Link>
+          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={16} aria-hidden="true" />Volver</Link>
           <Image src="/Logocomp.png" alt="UCompensar" width={120} height={44} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', marginTop: 8 }} />
           <div style={{ color: 'white', fontSize: 13, fontWeight: 700, letterSpacing: 1, textAlign: 'center' }}>
             PANEL RECURSOS HUMANOS<br />
@@ -509,7 +509,7 @@ export default function RRHH() {
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Contraseña</label>
               <input style={inputStyle} type="password" placeholder="••••••••" value={loginPass} onChange={e => setLoginPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} />
             </div>
-            {loginError && <div style={{ ...alertErr, marginBottom: 10 }}>{loginError}</div>}
+            {loginError && <Aviso tipo="error" style={{ marginBottom: 10 }}>{loginError}</Aviso>}
             <button style={btnPrimary} onClick={login} disabled={loginLoading}>{loginLoading ? 'Verificando...' : 'Ingresar'}</button>
             <button onClick={() => { setResetModal(true); setResetPaso(1) }} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: '#4B2D8F', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
               ¿Olvidaste tu contraseña?
@@ -526,29 +526,29 @@ export default function RRHH() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'white', borderRadius: 20, padding: 28, width: '90%', maxWidth: 380 }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 32 }}>🔐</div>
+              <ShieldCheck size={32} strokeWidth={2} aria-hidden="true" />
               <div style={{ fontSize: 18, fontWeight: 800, color: '#1A2D5A' }}>Restablecer contraseña</div>
             </div>
             {resetPaso === 1 && <>
               <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa tu usuario y te enviaremos un código al correo registrado.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Usuario institucional</label><input style={inputStyle} type="text" placeholder="Usuario institucional" value={resetEmail} onChange={e => setResetEmail(e.target.value)} /></div>
-              {resetErr && <div style={{ ...alertErr, marginBottom: 10 }}>{resetErr}</div>}
-              {resetOk && <div style={{ ...alertOk, marginBottom: 10 }}>{resetOk}</div>}
-              <button style={btnPrimary} onClick={solicitarCodigo} disabled={resetLoading}>{resetLoading ? '⏳ Enviando...' : 'Enviar código'}</button>
+              {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
+              {resetOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{resetOk}</Aviso>}
+              <button style={btnPrimary} onClick={solicitarCodigo} disabled={resetLoading}>{resetLoading ? 'Enviando…' : 'Enviar código'}</button>
             </>}
             {resetPaso === 2 && <>
               <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa el código de 6 dígitos que enviamos a tu correo.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Código</label><input style={{ ...inputStyle, letterSpacing: 8, fontSize: 20, textAlign: 'center' }} type="text" placeholder="000000" maxLength={6} value={resetCodigo} onChange={e => setResetCodigo(e.target.value)} /></div>
-              {resetErr && <div style={{ ...alertErr, marginBottom: 10 }}>{resetErr}</div>}
-              <button style={btnPrimary} onClick={verificarCodigo} disabled={resetLoading}>{resetLoading ? '⏳ Verificando...' : 'Verificar código'}</button>
+              {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
+              <button style={btnPrimary} onClick={verificarCodigo} disabled={resetLoading}>{resetLoading ? 'Verificando…' : 'Verificar código'}</button>
             </>}
             {resetPaso === 3 && <>
               <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa tu nueva contraseña.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nueva contraseña</label><input style={inputStyle} type="password" placeholder="••••••••" value={resetNueva} onChange={e => setResetNueva(e.target.value)} /></div>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Confirmar</label><input style={inputStyle} type="password" placeholder="••••••••" value={resetConfirmar} onChange={e => setResetConfirmar(e.target.value)} /></div>
-              {resetErr && <div style={{ ...alertErr, marginBottom: 10 }}>{resetErr}</div>}
-              {resetOk && <div style={{ ...alertOk, marginBottom: 10 }}>{resetOk}</div>}
-              <button style={btnPrimary} onClick={cambiarClave} disabled={resetLoading}>{resetLoading ? '⏳ Guardando...' : 'Guardar contraseña'}</button>
+              {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
+              {resetOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{resetOk}</Aviso>}
+              <button style={btnPrimary} onClick={cambiarClave} disabled={resetLoading}>{resetLoading ? 'Guardando…' : 'Guardar contraseña'}</button>
             </>}
             <button onClick={() => setResetModal(false)} style={{ width: '100%', marginTop: 12, background: 'none', border: '2px solid #ddd', borderRadius: 12, padding: 10, fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, color: '#888', cursor: 'pointer' }}>Cancelar</button>
           </div>
@@ -570,13 +570,13 @@ export default function RRHH() {
         {/* NAVBAR */}
         <div style={{ display: 'flex', gap: 6, padding: '14px 16px 0' }}>
           <Link href="/" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-            <span style={{ fontSize: 18 }}>🔐</span><span>Acceso</span>
+            <ScanFace size={18} aria-hidden="true" /><span>Acceso</span>
           </Link>
           <button style={{ flex: 1, padding: '10px 6px', border: '1.5px solid var(--orange)', borderRadius: 12, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 18 }}>👥</span><span>Registro</span>
+            <Users size={18} aria-hidden="true" /><span>Registro</span>
           </button>
           <Link href="/auditoria" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-            <span style={{ fontSize: 18 }}>📊</span><span>Auditoría</span>
+            <BarChart3 size={18} aria-hidden="true" /><span>Auditoría</span>
           </Link>
         </div>
 
@@ -705,48 +705,49 @@ export default function RRHH() {
               </>
             )}
 
-            {regOk && <div style={{ ...alertOk, marginTop: 10 }}>{regOk}</div>}
-            {regErr && <div style={{ ...alertErr, marginTop: 10 }}>{regErr}</div>}
+            {regOk && <Aviso tipo="ok" style={{ marginTop: 10 }}>{regOk}</Aviso>}
+            {regErr && <Aviso tipo="error" style={{ marginTop: 10 }}>{regErr}</Aviso>}
           </div>
 
           {/* ELIMINAR */}
           <div style={{ ...cardStyle, border: '2px solid #fee2e2' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#c62828', marginBottom: 6 }}>🗑️ Eliminar Persona</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, fontWeight: 800, color: '#c62828', marginBottom: 6 }}><Trash2 size={18} aria-hidden="true" />Eliminar Persona</div>
             <div style={{ fontSize: 13, color: '#666', marginBottom: 14 }}>Busque a la persona antes de eliminar</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 14 }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Número de identificación</label>
                 <input style={inputStyle} type="text" placeholder="Ej: 1234567890" value={eliminarId} onChange={e => setEliminarId(e.target.value)} onKeyDown={e => e.key === 'Enter' && buscarEmpleado()} />
               </div>
-              <button onClick={buscarEmpleado} style={{ padding: '13px 16px', border: 'none', borderRadius: 12, background: 'var(--blue)', color: 'white', fontSize: 18, cursor: 'pointer' }}>🔍</button>
+              <button onClick={buscarEmpleado} style={{ padding: '13px 16px', border: 'none', borderRadius: 12, background: 'var(--blue)', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center' }} aria-label="Buscar"><Search size={18} aria-hidden="true" /></button>
             </div>
-            {buscarLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13 }}>⏳ Buscando...</div>}
+            {buscarLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13 }}>Buscando…</div>}
             {empleadoEncontrado && (
               <div style={{ marginTop: 10, padding: 16, background: '#fff3e0', borderRadius: 12, border: '2px solid #FF9800' }}>
                 <div style={{ fontSize: 13, color: '#888', marginBottom: 4 }}>Persona encontrada:</div>
                 <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--blue)' }}>{empleadoEncontrado.nombre}</div>
                 <div style={{ fontSize: 13, color: '#666', marginTop: 2 }}>CC: {eliminarId}</div>
-                <div style={{ marginTop: 14, padding: 10, background: '#fdecea', borderRadius: 8, fontSize: 13, color: '#c62828', fontWeight: 600 }}>
-                  ⚠️ Esta acción eliminará a la persona y no se puede deshacer
+                <div style={{ marginTop: 14, padding: 10, background: '#fdecea', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c62828', fontWeight: 600 }}>
+                  <TriangleAlert size={16} style={{ flexShrink: 0 }} aria-hidden="true" />
+                  Esta acción eliminará a la persona y no se puede deshacer
                 </div>
-                <button onClick={confirmarEliminar} style={{ width: '100%', marginTop: 12, padding: 13, border: 'none', borderRadius: 12, background: '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>✅ Confirmar Eliminación</button>
+                <button onClick={confirmarEliminar} style={{ width: '100%', marginTop: 12, padding: 13, border: 'none', borderRadius: 12, background: '#c62828', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={17} aria-hidden="true" />Confirmar Eliminación</button>
                 <button onClick={() => { setEmpleadoEncontrado(null); setEliminarId('') }} style={{ width: '100%', marginTop: 8, padding: 11, border: '2px solid #888', borderRadius: 12, background: 'transparent', color: '#666', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>
               </div>
             )}
-            {elimLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13, marginTop: 8 }}>⏳ Eliminando...</div>}
-            {elimOk && <div style={{ ...alertOk, marginTop: 10 }}>{elimOk}</div>}
-            {elimErr && <div style={{ ...alertErr, marginTop: 10 }}>{elimErr}</div>}
+            {elimLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13, marginTop: 8 }}>Eliminando…</div>}
+            {elimOk && <Aviso tipo="ok" style={{ marginTop: 10 }}>{elimOk}</Aviso>}
+            {elimErr && <Aviso tipo="error" style={{ marginTop: 10 }}>{elimErr}</Aviso>}
           </div>
 
           {/* ACTIVOS */}
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#2e7d32' }}>👥 Personas Activas</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 800, color: '#2e7d32' }}><Users size={17} aria-hidden="true" />Personas Activas</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{activos.length > 0 ? `${activos.length} persona${activos.length !== 1 ? 's' : ''}` : '—'}</div>
               </div>
               <button onClick={toggleActivos} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 20, cursor: 'pointer' }}>
-                {activosLoading ? '⏳' : mostrarActivos ? 'Ocultar' : 'Ver todos'}
+                {activosLoading ? <LoaderCircle size={15} className="girando" aria-hidden="true" /> : mostrarActivos ? 'Ocultar' : 'Ver todos'}
               </button>
             </div>
             {mostrarActivos && (activos.length === 0
@@ -773,11 +774,11 @@ export default function RRHH() {
           <div style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#c62828' }}>🚪 Personas Retiradas</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 800, color: '#c62828' }}><DoorOpen size={17} aria-hidden="true" />Personas Retiradas</div>
                 <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{retirados.length > 0 ? `${retirados.length} retirado${retirados.length !== 1 ? 's' : ''}` : '—'}</div>
               </div>
               <button onClick={toggleRetirados} style={{ background: '#c62828', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 12, fontWeight: 700, padding: '8px 14px', borderRadius: 20, cursor: 'pointer' }}>
-                {retiradosLoading ? '⏳' : mostrarRetirados ? 'Ocultar' : 'Ver todos'}
+                {retiradosLoading ? <LoaderCircle size={15} className="girando" aria-hidden="true" /> : mostrarRetirados ? 'Ocultar' : 'Ver todos'}
               </button>
             </div>
             {mostrarRetirados && (retirados.length === 0
@@ -799,9 +800,9 @@ export default function RRHH() {
 
           {/* GESTIÓN USUARIOS */}
           <div style={{ ...cardStyle, border: '2px solid #e8e0ff' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#4B2D8F', marginBottom: 6 }}>👤 Gestión de Usuarios</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 18, fontWeight: 800, color: '#4B2D8F', marginBottom: 6 }}><UserCog size={18} aria-hidden="true" />Gestión de Usuarios</div>
             <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Administra los usuarios con acceso al sistema</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#1A2D5A', marginBottom: 10 }}>➕ Crear nuevo usuario</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#1A2D5A', marginBottom: 10 }}><UserPlus size={15} aria-hidden="true" />Crear nuevo usuario</div>
             <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Usuario institucional</label><input style={inputStyle} type="text" placeholder="Ej: jperez" value={nuevoUsuario} onChange={e => setNuevoUsuario(e.target.value)} /></div>
             <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Correo electrónico</label><input style={inputStyle} type="email" placeholder="correo@ejemplo.com" value={nuevoCorreo} onChange={e => setNuevoCorreo(e.target.value)} /></div>
             <div style={{ marginBottom: 14 }}>
@@ -819,18 +820,18 @@ export default function RRHH() {
                       background: nuevoRoles.includes(valor) ? 'var(--blue)' : 'transparent',
                       color: nuevoRoles.includes(valor) ? 'white' : '#777',
                     }}>
-                    {nuevoRoles.includes(valor) ? '✓ ' : ''}{texto}
+                    {nuevoRoles.includes(valor) && <Check size={14} aria-hidden="true" />}{texto}
                   </button>
                 ))}
               </div>
             </div>
-            {crearErr && <div style={{ ...alertErr, marginBottom: 10 }}>{crearErr}</div>}
-            {crearOk && <div style={{ ...alertOk, marginBottom: 10 }}>{crearOk}</div>}
-            <button style={btnPrimary} onClick={crearUsuario} disabled={crearLoading}>{crearLoading ? '⏳ Creando...' : 'Crear usuario'}</button>
+            {crearErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{crearErr}</Aviso>}
+            {crearOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{crearOk}</Aviso>}
+            <button style={btnPrimary} onClick={crearUsuario} disabled={crearLoading}>{crearLoading ? 'Creando…' : 'Crear usuario'}</button>
 
             {avisoEnvio && (
               <div style={{ marginTop: 14, padding: 14, background: '#f1f8f2', borderRadius: 12, border: '2px solid #2e7d32', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <div style={{ fontSize: 15, lineHeight: 1.4 }}>✓</div>
+                <Check size={16} aria-hidden="true" />
                 <div style={{ flex: 1, fontSize: 13, color: '#1b5e20', lineHeight: 1.5 }}>
                   Usuario <strong>{avisoEnvio.usuario}</strong> creado. Su contraseña de
                   un solo uso fue enviada al correo registrado.
@@ -845,10 +846,10 @@ export default function RRHH() {
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#1A2D5A' }}>👥 Usuarios registrados</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#1A2D5A' }}><Users size={15} aria-hidden="true" />Usuarios registrados</div>
               <button onClick={cargarUsuarios} style={{ background: 'var(--blue)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer' }}>Actualizar</button>
             </div>
-            {usuariosLoading && <div style={{ textAlign: 'center', color: '#888', fontSize: 13 }}>⏳ Cargando...</div>}
+            {usuariosLoading && <div style={{ textAlign: 'center', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13 }}><LoaderCircle size={15} className="girando" aria-hidden="true" />Cargando…</div>}
             {usuarios.map(u => {
               const roles = rolesEditados[u.usuario] || u.rol || []
               const cambiado = !!rolesEditados[u.usuario]
@@ -863,7 +864,7 @@ export default function RRHH() {
                     </div>
                   </div>
                   {u.usuario !== usuarioActual
-                    ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer', flexShrink: 0 }}>🗑️ Eliminar</button>
+                    ? <button onClick={() => eliminarUsuario(u.usuario)} style={{ background: '#fdecea', border: 'none', color: '#c62828', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 16, cursor: 'pointer', flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Trash2 size={13} aria-hidden="true" />Eliminar</button>
                     : <span style={{ fontSize: 11, color: '#888', fontStyle: 'italic', flexShrink: 0 }}>Tú</span>
                   }
                 </div>
@@ -888,7 +889,7 @@ export default function RRHH() {
                           // tiene los dos.
                           cursor: esEmergencia ? 'default' : 'pointer',
                         }}>
-                        {activo ? '✓ ' : ''}{texto}
+                        {activo && <Check size={14} aria-hidden="true" />}{texto}
                       </button>
                     )
                   })}
@@ -898,7 +899,7 @@ export default function RRHH() {
                       onClick={() => guardarRoles(u.usuario)}
                       disabled={guardandoRoles === u.usuario}
                       style={{ border: 'none', background: 'var(--orange)', color: '#fff', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 800, padding: '6px 14px', borderRadius: 14, cursor: 'pointer' }}>
-                      {guardandoRoles === u.usuario ? '⏳' : 'Guardar'}
+                      {guardandoRoles === u.usuario ? <LoaderCircle size={15} className="girando" aria-hidden="true" /> : 'Guardar'}
                     </button>
                   )}
                   {cambiado && (

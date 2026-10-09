@@ -4,6 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
+import { ArrowLeft, BarChart3, ScanFace, ShieldCheck, Users } from 'lucide-react'
+import Aviso from '../components/Aviso'
 
 // Mismo vocabulario que el módulo de registro. El valor guardado va en
 // minúscula; acá se presenta.
@@ -67,7 +69,7 @@ export default function Auditoria() {
       } else {
         setLoginError(body.descripcion || 'Usuario o contraseña incorrectos')
       }
-    } catch { setLoginError('⚠️ Error de conexión') }
+    } catch { setLoginError('Error de conexión') }
     setLoginLoading(false)
   }
 
@@ -183,10 +185,10 @@ export default function Auditoria() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
-        setResetOk('✅ Código enviado a tu correo')
+        setResetOk('Código enviado a tu correo')
         setTimeout(() => { setResetPaso(2); setResetErr(''); setResetOk('') }, 1500)
       } else setResetErr(body.descripcion || 'Error al enviar código')
-    } catch { setResetErr('⚠️ Error de conexión') }
+    } catch { setResetErr('Error de conexión') }
     setResetLoading(false)
   }
 
@@ -203,7 +205,7 @@ export default function Auditoria() {
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) { setResetPaso(3); setResetErr('') }
       else setResetErr(body.descripcion || 'Código incorrecto')
-    } catch { setResetErr('⚠️ Error de conexión') }
+    } catch { setResetErr('Error de conexión') }
     setResetLoading(false)
   }
 
@@ -220,18 +222,16 @@ export default function Auditoria() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
-        setResetOk('✅ Contraseña actualizada')
+        setResetOk('Contraseña actualizada')
         setTimeout(() => { setResetModal(false); setResetPaso(1) }, 2000)
       } else setResetErr(body.descripcion || 'Error al cambiar contraseña')
-    } catch { setResetErr('⚠️ Error de conexión') }
+    } catch { setResetErr('Error de conexión') }
     setResetLoading(false)
   }
 
   const cardStyle = { background: 'rgba(255,255,255,0.75)', borderRadius: 20, padding: '24px 20px', backdropFilter: 'blur(20px)', boxShadow: '0 8px 32px rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.4)' }
   const inputStyle = { width: '100%', padding: '13px 16px', border: '2px solid #e8e8e8', borderRadius: 12, fontFamily: 'Nunito, sans-serif', fontSize: 15, outline: 'none', background: '#fafafa' }
   const btnPrimary = { width: '100%', padding: 16, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 16, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 15px rgba(240,90,34,0.35)' }
-  const alertErr = { padding: '12px 16px', borderRadius: 12, fontSize: 14, fontWeight: 700, background: '#fdecea', color: '#c62828', border: '2px solid #c62828' }
-  const alertOk = { padding: '12px 16px', borderRadius: 12, fontSize: 14, fontWeight: 700, background: '#e8f5e9', color: '#2e7d32', border: '2px solid #2e7d32' }
 
   const Fondo = () => (
     <div style={{ position: 'fixed', inset: 0, zIndex: 0 }}>
@@ -271,7 +271,7 @@ export default function Auditoria() {
       <Fondo />
       <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div style={{ padding: '40px 20px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer', textDecoration: 'none' }}>← Volver</Link>
+          <Link href="/" style={{ alignSelf: 'flex-start', background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, padding: '8px 16px', borderRadius: 20, cursor: 'pointer', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}><ArrowLeft size={16} aria-hidden="true" />Volver</Link>
           <Image src="/Logocomp.png" alt="UCompensar" width={120} height={44} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', marginTop: 8 }} />
           <div style={{ color: 'white', fontSize: 13, fontWeight: 700, letterSpacing: 1, textAlign: 'center' }}>
             PANEL DE AUDITORÍA<br />
@@ -290,7 +290,7 @@ export default function Auditoria() {
               <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Contraseña</label>
               <input style={inputStyle} type="password" placeholder="••••••••" value={loginPass} onChange={e => setLoginPass(e.target.value)} onKeyDown={e => e.key === 'Enter' && login()} />
             </div>
-            {loginError && <div style={{ ...alertErr, marginBottom: 10 }}>{loginError}</div>}
+            {loginError && <Aviso tipo="error" style={{ marginBottom: 10 }}>{loginError}</Aviso>}
             <button style={btnPrimary} onClick={login} disabled={loginLoading}>{loginLoading ? 'Verificando...' : 'Ingresar'}</button>
             <button onClick={() => { setResetModal(true); setResetPaso(1) }} style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: '#4B2D8F', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
               ¿Olvidaste tu contraseña?
@@ -306,29 +306,29 @@ export default function Auditoria() {
         <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'white', borderRadius: 20, padding: 28, width: '90%', maxWidth: 380 }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
-              <div style={{ fontSize: 32 }}>🔐</div>
+              <ShieldCheck size={32} strokeWidth={2} aria-hidden="true" />
               <div style={{ fontSize: 18, fontWeight: 800, color: '#1A2D5A' }}>Restablecer contraseña</div>
             </div>
             {resetPaso === 1 && <>
               <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa tu usuario y te enviaremos un código al correo registrado.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Usuario institucional</label><input style={inputStyle} type="text" placeholder="Usuario institucional" value={resetEmail} onChange={e => setResetEmail(e.target.value)} /></div>
-              {resetErr && <div style={{ ...alertErr, marginBottom: 10 }}>{resetErr}</div>}
-              {resetOk && <div style={{ ...alertOk, marginBottom: 10 }}>{resetOk}</div>}
-              <button style={btnPrimary} onClick={solicitarCodigo} disabled={resetLoading}>{resetLoading ? '⏳ Enviando...' : 'Enviar código'}</button>
+              {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
+              {resetOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{resetOk}</Aviso>}
+              <button style={btnPrimary} onClick={solicitarCodigo} disabled={resetLoading}>{resetLoading ? 'Enviando…' : 'Enviar código'}</button>
             </>}
             {resetPaso === 2 && <>
               <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa el código de 6 dígitos enviado a tu correo.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Código</label><input style={{ ...inputStyle, letterSpacing: 8, fontSize: 20, textAlign: 'center' }} type="text" placeholder="000000" maxLength={6} value={resetCodigo} onChange={e => setResetCodigo(e.target.value)} /></div>
-              {resetErr && <div style={{ ...alertErr, marginBottom: 10 }}>{resetErr}</div>}
-              <button style={btnPrimary} onClick={verificarCodigo} disabled={resetLoading}>{resetLoading ? '⏳ Verificando...' : 'Verificar código'}</button>
+              {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
+              <button style={btnPrimary} onClick={verificarCodigo} disabled={resetLoading}>{resetLoading ? 'Verificando…' : 'Verificar código'}</button>
             </>}
             {resetPaso === 3 && <>
               <p style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Ingresa tu nueva contraseña.</p>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Nueva contraseña</label><input style={inputStyle} type="password" placeholder="••••••••" value={resetNueva} onChange={e => setResetNueva(e.target.value)} /></div>
               <div style={{ marginBottom: 14 }}><label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#444', marginBottom: 6 }}>Confirmar</label><input style={inputStyle} type="password" placeholder="••••••••" value={resetConfirmar} onChange={e => setResetConfirmar(e.target.value)} /></div>
-              {resetErr && <div style={{ ...alertErr, marginBottom: 10 }}>{resetErr}</div>}
-              {resetOk && <div style={{ ...alertOk, marginBottom: 10 }}>{resetOk}</div>}
-              <button style={btnPrimary} onClick={cambiarClave} disabled={resetLoading}>{resetLoading ? '⏳ Guardando...' : 'Guardar contraseña'}</button>
+              {resetErr && <Aviso tipo="error" style={{ marginBottom: 10 }}>{resetErr}</Aviso>}
+              {resetOk && <Aviso tipo="ok" style={{ marginBottom: 10 }}>{resetOk}</Aviso>}
+              <button style={btnPrimary} onClick={cambiarClave} disabled={resetLoading}>{resetLoading ? 'Guardando…' : 'Guardar contraseña'}</button>
             </>}
             <button onClick={() => setResetModal(false)} style={{ width: '100%', marginTop: 12, background: 'none', border: '2px solid #ddd', borderRadius: 12, padding: 10, fontFamily: 'Nunito, sans-serif', fontSize: 14, fontWeight: 700, color: '#888', cursor: 'pointer' }}>Cancelar</button>
           </div>
@@ -350,13 +350,13 @@ export default function Auditoria() {
         {/* NAVBAR */}
         <div style={{ display: 'flex', gap: 6, padding: '14px 16px 0' }}>
           <Link href="/" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-            <span style={{ fontSize: 18 }}>🔐</span><span>Acceso</span>
+            <ScanFace size={18} aria-hidden="true" /><span>Acceso</span>
           </Link>
           <Link href="/rrhh" style={{ flex: 1, padding: '10px 6px', border: '1.5px solid rgba(255,255,255,0.1)', borderRadius: 12, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, textDecoration: 'none' }}>
-            <span style={{ fontSize: 18 }}>👥</span><span>Registro</span>
+            <Users size={18} aria-hidden="true" /><span>Registro</span>
           </Link>
           <button style={{ flex: 1, padding: '10px 6px', border: '1.5px solid var(--orange)', borderRadius: 12, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 18 }}>📊</span><span>Auditoría</span>
+            <BarChart3 size={18} aria-hidden="true" /><span>Auditoría</span>
           </button>
         </div>
 
@@ -405,11 +405,11 @@ export default function Auditoria() {
               </button>
             </div>
 
-            {errorCarga && <div style={{ ...alertErr, marginBottom: 14 }}>{errorCarga}</div>}
+            {errorCarga && <Aviso tipo="error" style={{ marginBottom: 14 }}>{errorCarga}</Aviso>}
 
             {datos.length === 0
               ? <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: 14 }}>
-                  {loading ? '⏳ Cargando registros...' : 'No hay registros en este período'}
+                  {loading ? 'Cargando registros…' : 'No hay registros en este período'}
                 </div>
               : <div style={{ overflowX: 'auto', borderRadius: 14 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

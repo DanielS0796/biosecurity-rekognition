@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { API_RESET } from '../config'
+import { Check, Dot } from 'lucide-react'
 
 /**
  * Pantalla que intercepta el primer ingreso y obliga a cambiar la contraseña
@@ -105,15 +106,15 @@ export default function CambioClaveObligatorio({ usuario, claveActual, onListo, 
         <ul style={e.lista}>
           {estado.cumplidas.map((r, i) => (
             <li key={i} style={{ ...e.regla, color: r.ok ? '#2e7d32' : '#888' }}>
-              <span style={e.marca}>{r.ok ? '✓' : '·'}</span> {r.texto}
+              <span style={e.marca}>{r.ok ? <Check size={14} aria-hidden="true" /> : <Dot size={14} aria-hidden="true" />}</span> {r.texto}
             </li>
           ))}
           <li style={{ ...e.regla, color: nueva && !estado.contieneUsuario ? '#2e7d32' : '#888' }}>
-            <span style={e.marca}>{nueva && !estado.contieneUsuario ? '✓' : '·'}</span>
+            <span style={e.marca}>{nueva && !estado.contieneUsuario ? <Check size={14} aria-hidden="true" /> : <Dot size={14} aria-hidden="true" />}</span>
             {' '}No contiene tu nombre de usuario
           </li>
           <li style={{ ...e.regla, color: estado.coinciden ? '#2e7d32' : '#888' }}>
-            <span style={e.marca}>{estado.coinciden ? '✓' : '·'}</span> Las dos coinciden
+            <span style={e.marca}>{estado.coinciden ? <Check size={14} aria-hidden="true" /> : <Dot size={14} aria-hidden="true" />}</span> Las dos coinciden
           </li>
           {nueva && !estado.distinta && (
             <li style={{ ...e.regla, color: '#c62828' }}>
@@ -166,7 +167,7 @@ const e = {
   },
   lista: { listStyle: 'none', padding: 0, margin: '4px 0 16px' },
   regla: { fontSize: 12.5, lineHeight: 1.9, display: 'flex', alignItems: 'baseline', gap: 2 },
-  marca: { display: 'inline-block', width: 16, fontWeight: 800 },
+  marca: { display: 'inline-flex', alignItems: 'center', width: 16, fontWeight: 800 },
   error: {
     padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
     background: '#fdecea', color: '#c62828', border: '1px solid #c62828',
