@@ -194,6 +194,9 @@ terraform apply -auto-approve \
   -target=aws_api_gateway_usage_plan.auditoria_plan \
   -target=aws_api_gateway_usage_plan_key.rrhh_plan_key \
   -target=aws_api_gateway_usage_plan_key.auditoria_plan_key \
+  -target=aws_lambda_permission.apigw_rrhh \
+  -target=aws_lambda_permission.apigw_auditoria \
+  -target=aws_lambda_permission.apigw_reset \
   -target=aws_iam_role_policy.lambda_liveness_policy \
   -target=aws_iam_role_policy.lambda_reset_policy \
   -target=aws_iam_role_policy.lambda_dynamo_policy \

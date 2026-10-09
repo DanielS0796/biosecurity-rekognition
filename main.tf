@@ -551,7 +551,14 @@ resource "aws_api_gateway_integration_response" "rrhh_options" {
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
-  depends_on = [aws_api_gateway_integration.rrhh_options]
+  # AWS exige que la respuesta de método exista antes: sin ella,
+  # PutIntegrationResponse falla con 'No method response exists for
+  # method'. La dependencia no se deduce sola porque los dos
+  # recursos no se referencian entre sí.
+  depends_on = [
+    aws_api_gateway_integration.rrhh_options,
+    aws_api_gateway_method_response.rrhh_options_200,
+  ]
 }
 
 resource "aws_api_gateway_deployment" "rrhh_deployment" {
@@ -577,6 +584,7 @@ resource "aws_api_gateway_deployment" "rrhh_deployment" {
       aws_api_gateway_integration.rrhh_delete,
       aws_api_gateway_method.rrhh_options,
       aws_api_gateway_integration.rrhh_options,
+      aws_api_gateway_method_response.rrhh_options_200,
       aws_api_gateway_integration_response.rrhh_options,
     ]))
   }
@@ -586,6 +594,7 @@ resource "aws_api_gateway_deployment" "rrhh_deployment" {
     aws_api_gateway_integration.rrhh_get,
     aws_api_gateway_integration.rrhh_delete,
     aws_api_gateway_integration.rrhh_options,
+    aws_api_gateway_method_response.rrhh_options_200,
     aws_api_gateway_integration_response.rrhh_options,
   ]
 }
@@ -687,7 +696,14 @@ resource "aws_api_gateway_integration_response" "auditoria_options" {
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
-  depends_on = [aws_api_gateway_integration.auditoria_options]
+  # AWS exige que la respuesta de método exista antes: sin ella,
+  # PutIntegrationResponse falla con 'No method response exists for
+  # method'. La dependencia no se deduce sola porque los dos
+  # recursos no se referencian entre sí.
+  depends_on = [
+    aws_api_gateway_integration.auditoria_options,
+    aws_api_gateway_method_response.auditoria_options_200,
+  ]
 }
 
 resource "aws_api_gateway_deployment" "auditoria_deployment" {
@@ -701,6 +717,7 @@ resource "aws_api_gateway_deployment" "auditoria_deployment" {
       aws_api_gateway_integration.auditoria_lambda,
       aws_api_gateway_method.auditoria_options,
       aws_api_gateway_integration.auditoria_options,
+      aws_api_gateway_method_response.auditoria_options_200,
       aws_api_gateway_integration_response.auditoria_options,
     ]))
   }
@@ -708,6 +725,7 @@ resource "aws_api_gateway_deployment" "auditoria_deployment" {
   depends_on = [
     aws_api_gateway_integration.auditoria_lambda,
     aws_api_gateway_integration.auditoria_options,
+    aws_api_gateway_method_response.auditoria_options_200,
     aws_api_gateway_integration_response.auditoria_options,
   ]
 }
@@ -1062,7 +1080,14 @@ resource "aws_api_gateway_integration_response" "reset_options" {
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
-  depends_on = [aws_api_gateway_integration.reset_options]
+  # AWS exige que la respuesta de método exista antes: sin ella,
+  # PutIntegrationResponse falla con 'No method response exists for
+  # method'. La dependencia no se deduce sola porque los dos
+  # recursos no se referencian entre sí.
+  depends_on = [
+    aws_api_gateway_integration.reset_options,
+    aws_api_gateway_method_response.reset_options_200,
+  ]
 }
 
 resource "aws_api_gateway_deployment" "reset_deployment" {
@@ -1076,6 +1101,7 @@ resource "aws_api_gateway_deployment" "reset_deployment" {
       aws_api_gateway_integration.reset_lambda,
       aws_api_gateway_method.reset_options,
       aws_api_gateway_integration.reset_options,
+      aws_api_gateway_method_response.reset_options_200,
       aws_api_gateway_integration_response.reset_options,
     ]))
   }
@@ -1083,6 +1109,7 @@ resource "aws_api_gateway_deployment" "reset_deployment" {
   depends_on = [
     aws_api_gateway_integration.reset_lambda,
     aws_api_gateway_integration.reset_options,
+    aws_api_gateway_method_response.reset_options_200,
     aws_api_gateway_integration_response.reset_options,
   ]
 }
