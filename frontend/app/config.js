@@ -31,8 +31,8 @@ export const API_LIVENESS_RESULT =
 // nada: el acceso ahora va por API_LIVENESS_INIT y API_LIVENESS_RESULT,
 // donde la imagen que se compara es la que entrega Rekognition, no una
 // que mande el navegador.
-export const API_RRHH_URL  = "https://uadjcukyx1.execute-api.us-east-1.amazonaws.com/prod/registrar";
-export const API_AUDITORIA = "https://3tqg18yo1l.execute-api.us-east-1.amazonaws.com/prod/reporte";
-export const API_RESET     = "https://0geuesizya.execute-api.us-east-1.amazonaws.com/prod/reset";
-export const API_KEY_RRHH  = "UBsklq8EyX8pPI2W2sHIp39gxALuSAGv7posYBGW";
-export const API_KEY_AUD   = "XYyh4xXyyka10J27CVIaA4UiKpjDW37a4lepAX1n";
+export const API_RRHH_URL  = "https://jfshekzwbl.execute-api.us-east-1.amazonaws.com/prod/registrar";
+export const API_AUDITORIA = "https://sdvymkutn7.execute-api.us-east-1.amazonaws.com/prod/reporte";
+export const API_RESET     = "https://qwnsrgtar9.execute-api.us-east-1.amazonaws.com/prod/reset";
+export const API_KEY_RRHH  = "0LLZzFXzuPZ1KcMiKGkH6AvSDzN9Y0p3OOzEVrcc";
+export const API_KEY_AUD   = "aYpCNw1m5S10zsPNhR7ao7PLLyoYTd6R6iVwTG6b";
