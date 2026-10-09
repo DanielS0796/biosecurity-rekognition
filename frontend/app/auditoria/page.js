@@ -4,7 +4,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
-import { ArrowLeft, BarChart3, ScanFace, Search, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeft, BarChart3, RefreshCw, ScanFace, Search, ShieldCheck, Users } from 'lucide-react'
 import Aviso from '../components/Aviso'
 
 // Mismo vocabulario que el módulo de registro. El valor guardado va en
@@ -17,6 +17,17 @@ const ETIQUETA_VINCULO = {
 }
 
 const vinculoLegible = (v) => ETIQUETA_VINCULO[v] || v || ''
+
+// El día de hoy en la zona del usuario. toISOString() da UTC: a partir de
+// las 7 de la noche en Bogotá ya es el día siguiente, y la tabla arrancaría
+// mostrando un día vacío mientras la gente todavía entra y sale.
+const hoyLocal = () => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
 
 // Para buscar sin que importen las tildes ni las mayúsculas: quien
 // escribe "gomez" espera encontrar a "Gómez".
@@ -45,6 +56,7 @@ export default function Auditoria() {
 
   const [datos, setDatos] = useState([])
   const [busqueda, setBusqueda] = useState('')
+  const [actualizado, setActualizado] = useState(null)
 
   // El filtro es del navegador, sobre lo ya cargado: no vuelve a llamar
   // al API. Eso lo hace instantáneo, y también significa que solo ve el
@@ -60,8 +72,11 @@ export default function Auditoria() {
   const personas = useMemo(
     () => new Set(visibles.map(i => i.identificacion)).size, [visibles])
   const [loading, setLoading] = useState(false)
-  const [fechaDesde, setFechaDesde] = useState(() => new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0])
-  const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0])
+  // La tabla arranca mostrando el día de hoy. Es lo que mira a diario
+  // quien está en la portería; el histórico completo se descarga, no se
+  // navega. El rango de fechas sigue ahí para ampliarlo cuando haga falta.
+  const [fechaDesde, setFechaDesde] = useState(() => hoyLocal())
+  const [fechaHasta, setFechaHasta] = useState(() => hoyLocal())
   const [errorCarga, setErrorCarga] = useState('')
   const [exportando, setExportando] = useState(false)
 
@@ -125,6 +140,7 @@ export default function Auditoria() {
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       setDatos(body.items || [])
+      setActualizado(new Date())
     } catch (err) {
       setDatos([])
       setErrorCarga('No se pudieron cargar los registros: ' + err.message)
@@ -138,12 +154,39 @@ export default function Auditoria() {
   // La librería se carga en este momento y no al abrir la página, para no
   // sumarle peso a la carga inicial.
   async function exportarExcel() {
-    // Se exporta lo que la persona está viendo. Si buscó una cédula y
-    // descarga, espera esa hoja, no la de todo el mundo.
-    const paraExportar = visibles
-    if (!paraExportar.length) { alert('No hay registros para exportar.'); return }
     setExportando(true)
+    setErrorCarga('')
     try {
+      // El Excel no exporta lo que está en pantalla: va por el histórico
+      // completo. La tabla muestra el día de hoy porque es lo que se
+      // consulta a diario, pero un reporte que solo trae hoy no sirve
+      // para el archivo de la institución.
+      //
+      // Si hay una búsqueda activa, se aplica sobre ese histórico. Así
+      // buscar una cédula y descargar da todas las visitas de esa persona
+      // desde que el sistema existe, que es justo lo que se necesita
+      // cuando alguien pregunta por un caso concreto.
+      const r = await fetch(`${API_AUDITORIA}?format=json`, {
+        headers: { 'x-api-key': API_KEY_AUD },
+      })
+      const data = await r.json()
+      const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
+      const historico = body.items || []
+
+      const q = normalizar(busqueda).trim()
+      const paraExportar = q
+        ? historico.filter(i =>
+            normalizar(i.identificacion).includes(q) || normalizar(i.nombre).includes(q))
+        : historico
+
+      if (!paraExportar.length) {
+        setErrorCarga(q
+          ? `No hay registros de «${busqueda}» en todo el histórico.`
+          : 'No hay registros para exportar.')
+        setExportando(false)
+        return
+      }
+
       const ExcelJS = (await import('exceljs')).default
       const libro = new ExcelJS.Workbook()
       libro.creator = 'Biosecurity UCompensar'
@@ -441,15 +484,15 @@ export default function Auditoria() {
               <button onClick={cargarAuditoria} disabled={loading} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
                 {loading ? 'Buscando...' : 'Buscar'}
               </button>
-              <button onClick={exportarExcel} disabled={exportando || !visibles.length} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: exportando ? 'wait' : 'pointer', opacity: (exportando || !visibles.length) ? 0.5 : 1 }}>
-                {exportando ? 'Generando...' : 'Exportar a Excel'}
+              <button onClick={exportarExcel} disabled={exportando} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: exportando ? 'wait' : 'pointer', opacity: exportando ? 0.5 : 1 }}>
+                {exportando ? 'Generando…' : busqueda.trim() ? 'Exportar histórico de la búsqueda' : 'Exportar histórico completo'}
               </button>
             </div>
 
             {errorCarga && <Aviso tipo="error" style={{ marginBottom: 14 }}>{errorCarga}</Aviso>}
 
-            {datos.length > 0 && (
-              <div style={{ position: 'relative', marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
                 <Search size={16} aria-hidden="true"
                   style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#888', pointerEvents: 'none' }} />
                 <input
@@ -460,6 +503,24 @@ export default function Auditoria() {
                   aria-label="Buscar por cédula o nombre"
                   style={{ ...inputStyle, padding: '11px 12px 11px 38px', fontSize: 13 }}
                 />
+              </div>
+              {/* Refrescar es volver a pedir el mismo rango. Vale la pena
+                  tenerlo aparte del botón de buscar porque la tabla muestra
+                  el día en curso: mientras alguien la mira, la gente sigue
+                  entrando y saliendo. */}
+              <button
+                onClick={cargarAuditoria}
+                disabled={loading}
+                aria-label="Actualizar la tabla"
+                title="Actualizar"
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, flexShrink: 0, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+                <RefreshCw size={17} className={loading ? 'girando' : undefined} aria-hidden="true" />
+              </button>
+            </div>
+
+            {actualizado && (
+              <div style={{ fontSize: 11, color: '#888', marginBottom: 12 }}>
+                Actualizado a las {actualizado.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
 
@@ -484,34 +545,31 @@ export default function Auditoria() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Identificación', 'Nombre', 'Vínculo', 'Entrada', 'Salida', 'Tiempo'].map((h, i, arr) => (
-                          <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
+                        {['Identificación', 'Nombre', 'Vínculo', 'Fecha entrada', 'Hora entrada', 'Fecha salida', 'Hora salida', 'Tiempo'].map((h, i, arr) => (
+                          <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {visibles.map((item, i) => {
-                        // La fecha de salida solo se muestra cuando es
-                        // otra: repetirla en cada fila es ruido, pero
-                        // esconderla cuando la visita cruzó la medianoche
-                        // haría leer mal la hora.
+                        // Una visita que cruzó la medianoche tiene dos
+                        // fechas distintas. Se resalta para que nadie lea
+                        // la hora de salida como si fuera del mismo día.
                         const otroDia = item.fecha_salida && item.fecha_salida !== item.fecha_entrada
                         return (
                         <tr key={i}>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontWeight: 700 }}>{item.identificacion || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>{item.nombre || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#666' }}>{vinculoLegible(item.tipo_persona) || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>
-                            <div style={{ color: '#2e7d32', fontWeight: 600 }}>{item.hora_entrada || '-'}</div>
-                            <div style={{ fontSize: 11, color: '#999' }}>{item.fecha_entrada || ''}</div>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{item.fecha_entrada || '-'}</td>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#2e7d32', fontWeight: 600, whiteSpace: 'nowrap' }}>{item.hora_entrada || '-'}</td>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap', color: otroDia ? '#c62828' : '#444', fontWeight: otroDia ? 700 : 400 }}>
+                            {item.fecha_salida || '-'}
                           </td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>
                             {item.hora_salida
-                              ? <>
-                                  <div style={{ color: '#c62828', fontWeight: 600 }}>{item.hora_salida}</div>
-                                  {otroDia && <div style={{ fontSize: 11, color: '#c62828' }}>{item.fecha_salida}</div>}
-                                </>
-                              : <span style={{ background: '#fff3e0', color: '#e65100', border: '1px solid #ffb74d', borderRadius: 20, padding: '3px 9px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                              ? <span style={{ color: '#c62828', fontWeight: 600 }}>{item.hora_salida}</span>
+                              : <span style={{ background: '#fff3e0', color: '#e65100', border: '1px solid #ffb74d', borderRadius: 20, padding: '3px 9px', fontSize: 11, fontWeight: 700 }}>
                                   Sin salida
                                 </span>}
                           </td>
