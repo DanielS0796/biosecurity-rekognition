@@ -545,7 +545,7 @@ export default function Auditoria() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Identificación', 'Nombre', 'Vínculo', 'Entrada', 'Salida', 'Tiempo'].map((h, i, arr) => (
+                        {['Identificación', 'Nombre', 'Vínculo', 'Hora de entrada', 'Hora de salida', 'Tiempo'].map((h, i, arr) => (
                           <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
                         ))}
                       </tr>
