@@ -1,0 +1,6 @@
+# Los PNG se regeneran con ./diagramas/generar.sh. No se versionan:
+# un binario que cambia en cada corrida ensucia el historial, y el
+# archivo que vale es el que los genera.
+#
+# Si hace falta uno para la tesis, se corre el script y se exporta.
+*.png
