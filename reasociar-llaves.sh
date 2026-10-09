@@ -39,12 +39,33 @@ terraform apply -auto-approve \
   -target=aws_api_gateway_usage_plan_key.auditoria_plan_key \
   || { echo; echo "Falló el apply. Revisa el error de arriba."; exit 1; }
 
-# API Gateway guarda un rato la decisión sobre una llave antes de volver
-# a consultarla. Probar de inmediato puede dar 403 aunque la asociación
-# ya esté bien, y eso manda a buscar el error donde no está.
+# API Gateway guarda su decisión sobre una llave hasta cinco minutos, y
+# guarda también los "no". Si ya había un 403 cacheado de antes de la
+# reasociación, una sola prueba al minuto sigue dando 403 aunque todo
+# esté bien, y eso manda a buscar el error donde no está. Por eso
+# reintenta en vez de esperar un rato fijo y resignarse.
 echo
-echo "  Esperando 60 s a que expire la caché de llaves de API Gateway"
-sleep 60
+echo "  Comprobando cada 45 s hasta que la caché expire (máximo 6 min)"
+echo
+
+for intento in 1 2 3 4 5 6 7 8; do
+  SALIDA="$(./verificar-apis.sh 2>&1)"
+  FALLOS="$(echo "$SALIDA" | grep 'terraform' | grep -c '✗')"
+
+  if [ "$FALLOS" = "0" ]; then
+    echo "$SALIDA"
+    echo
+    echo "Listo en el intento $intento. Sigue ./migrar-config.sh"
+    exit 0
+  fi
+
+  printf '  intento %d · %s endpoint(s) todavía en 403\n' "$intento" "$FALLOS"
+  [ "$intento" -lt 8 ] && sleep 45
+done
 
 echo
-./verificar-apis.sh
+echo "$SALIDA"
+echo
+echo "Seis minutos y sigue fallando: ya no es la caché."
+echo "Corre ./diagnosticar-llave.sh para ver qué es."
+exit 1

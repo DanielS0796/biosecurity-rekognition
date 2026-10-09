@@ -27,16 +27,33 @@ echo
 [ -f "$CONFIG" ] || { echo "No encuentro $CONFIG. Corre esto desde la raíz."; exit 1; }
 
 # ── 1. Los endpoints nuevos tienen que estar sirviendo ───────────────
+# Si un endpoint falla, se reintenta antes de rendirse: API Gateway
+# guarda su decisión sobre una llave hasta cinco minutos, y guarda
+# también los "no", así que un 403 recién después de tocar un plan de
+# uso puede ser caché y no un problema de verdad.
 echo "  Paso 1 · comprobando los endpoints de Terraform"
-SALIDA="$(./verificar-apis.sh 2>&1)"
+
+for intento in 1 2 3 4; do
+  SALIDA="$(./verificar-apis.sh 2>&1)"
+  FALLOS="$(echo "$SALIDA" | grep 'terraform' | grep -c '✗')"
+  [ "$FALLOS" = "0" ] && break
+  if [ "$intento" -lt 4 ]; then
+    printf '    %s endpoint(s) en falla; reintento en 45 s (%d de 4)\n' \
+      "$FALLOS" "$intento"
+    sleep 45
+  fi
+done
+
 echo "$SALIDA" | sed 's/^/    /'
 
-FALLOS="$(echo "$SALIDA" | grep 'terraform' | grep -c '✗')"
 if [ "$FALLOS" != "0" ]; then
   echo
-  echo "  $FALLOS endpoint(s) de Terraform no contestan 200."
+  echo "  $FALLOS endpoint(s) de Terraform no contestan 200 después de"
+  echo "  cuatro intentos, así que no es la caché."
   echo "  No se cambia config.js: con esto migrado, eso serían 403 en la"
   echo "  cara de quien use la aplicación."
+  echo
+  echo "  Corre ./diagnosticar-llave.sh si son los dos que piden llave."
   exit 1
 fi
 
