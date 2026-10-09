@@ -218,6 +218,16 @@ async function completarDatosPersonales(registros) {
     }
 }
 
+// Minutos entre la entrada y la salida. Null mientras la visita siga
+// abierta: cero diría que la persona entró y salió en el mismo instante,
+// y vacío no se puede sumar en una hoja de cálculo.
+function minutosDentro(entrada, salida) {
+    if (!entrada || !salida) return null;
+    const ms = new Date(salida) - new Date(entrada);
+    if (!Number.isFinite(ms) || ms < 0) return null;
+    return Math.round(ms / 60000);
+}
+
 function aFilas(registros) {
     return registros.map(r => ({
         identificacion: r.identificacion,
@@ -225,9 +235,15 @@ function aFilas(registros) {
         // Vacío en quienes se registraron antes de que existiera la
         // categoría; no se les supone una.
         tipo_persona: r.tipo_persona || "",
-        fecha: r.fecha,
+        // Las dos fechas van separadas porque una visita puede cruzar la
+        // medianoche: quien entra a las 11 de la noche sale al día
+        // siguiente, y una sola columna "Fecha" obligaba a adivinar cuál
+        // de las dos era.
+        fecha_entrada: r.fecha,
         hora_entrada: horaLocal(r.hora_entrada),
+        fecha_salida: fechaLocal(r.hora_salida),
         hora_salida: horaLocal(r.hora_salida),
+        minutos_dentro: minutosDentro(r.hora_entrada, r.hora_salida),
         metodo: r.metodo || "",
     }));
 }
@@ -280,12 +296,22 @@ exports.handler = Sentry.wrapHandler(async (event) => {
         // CSV con punto y coma: es el separador que espera Excel en
         // configuración regional de español, y con coma mete la fila
         // completa en una sola columna.
-        const encabezados = ["Identificacion", "Nombre", "Vinculo", "Fecha", "Hora Entrada", "Hora Salida", "Metodo"];
+        // La fecha de salida se repite cuando la visita no cruza la
+        // medianoche, y aun así va siempre: una columna que a veces está
+        // vacía rompe los filtros y las tablas dinámicas de Excel.
+        const encabezados = [
+            "Identificacion", "Nombre", "Vinculo",
+            "Fecha Entrada", "Hora Entrada",
+            "Fecha Salida", "Hora Salida",
+            "Minutos Dentro", "Metodo",
+        ];
         const lineas = [
             encabezados,
             ...filas.map(f => [
-                f.identificacion, f.nombre, f.tipo_persona, f.fecha,
-                f.hora_entrada, f.hora_salida || "Sin salida", f.metodo,
+                f.identificacion, f.nombre, f.tipo_persona,
+                f.fecha_entrada, f.hora_entrada,
+                f.fecha_salida, f.hora_salida || "Sin salida",
+                f.minutos_dentro ?? "", f.metodo,
             ]),
         ].map(fila => fila.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
 

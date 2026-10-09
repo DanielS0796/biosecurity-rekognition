@@ -1,10 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
-import { ArrowLeft, BarChart3, ScanFace, ShieldCheck, Users } from 'lucide-react'
+import { ArrowLeft, BarChart3, ScanFace, Search, ShieldCheck, Users } from 'lucide-react'
 import Aviso from '../components/Aviso'
 
 // Mismo vocabulario que el módulo de registro. El valor guardado va en
@@ -18,6 +18,20 @@ const ETIQUETA_VINCULO = {
 
 const vinculoLegible = (v) => ETIQUETA_VINCULO[v] || v || ''
 
+// Para buscar sin que importen las tildes ni las mayúsculas: quien
+// escribe "gomez" espera encontrar a "Gómez".
+const normalizar = (v) =>
+  String(v ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+// Los minutos crudos sirven para sumar en Excel; en pantalla se leen mal.
+const duracionLegible = (min) => {
+  if (min === null || min === undefined) return ''
+  if (min < 60) return `${min} min`
+  const h = Math.floor(min / 60)
+  const resto = min % 60
+  return resto ? `${h} h ${resto} min` : `${h} h`
+}
+
 export default function Auditoria() {
   const [logueado, setLogueado] = useState(false)
   const [usuarioActual, setUsuarioActual] = useState('')
@@ -30,6 +44,21 @@ export default function Auditoria() {
   const [cambioPendiente, setCambioPendiente] = useState(null)
 
   const [datos, setDatos] = useState([])
+  const [busqueda, setBusqueda] = useState('')
+
+  // El filtro es del navegador, sobre lo ya cargado: no vuelve a llamar
+  // al API. Eso lo hace instantáneo, y también significa que solo ve el
+  // rango de fechas que se consultó, que es lo que avisa el mensaje de
+  // abajo cuando no encuentra nada.
+  const visibles = useMemo(() => {
+    const q = normalizar(busqueda).trim()
+    if (!q) return datos
+    return datos.filter(i =>
+      normalizar(i.identificacion).includes(q) || normalizar(i.nombre).includes(q))
+  }, [datos, busqueda])
+
+  const personas = useMemo(
+    () => new Set(visibles.map(i => i.identificacion)).size, [visibles])
   const [loading, setLoading] = useState(false)
   const [fechaDesde, setFechaDesde] = useState(() => new Date(Date.now() - 30*24*60*60*1000).toISOString().split('T')[0])
   const [fechaHasta, setFechaHasta] = useState(() => new Date().toISOString().split('T')[0])
@@ -109,7 +138,10 @@ export default function Auditoria() {
   // La librería se carga en este momento y no al abrir la página, para no
   // sumarle peso a la carga inicial.
   async function exportarExcel() {
-    if (!datos.length) { alert('No hay registros para exportar. Presione Buscar primero.'); return }
+    // Se exporta lo que la persona está viendo. Si buscó una cédula y
+    // descarga, espera esa hoja, no la de todo el mundo.
+    const paraExportar = visibles
+    if (!paraExportar.length) { alert('No hay registros para exportar.'); return }
     setExportando(true)
     try {
       const ExcelJS = (await import('exceljs')).default
@@ -121,13 +153,18 @@ export default function Auditoria() {
         views: [{ state: 'frozen', ySplit: 1 }],
       })
 
+      // Las dos fechas van separadas porque una visita puede cruzar la
+      // medianoche. Y los minutos van como número, no como "2 h 15 min":
+      // así se pueden sumar y promediar en la hoja.
       hoja.columns = [
         { header: 'Identificación', key: 'identificacion', width: 18 },
         { header: 'Nombre', key: 'nombre', width: 32 },
         { header: 'Vínculo', key: 'vinculo', width: 16 },
-        { header: 'Fecha', key: 'fecha', width: 14 },
-        { header: 'Hora entrada', key: 'entrada', width: 14 },
-        { header: 'Hora salida', key: 'salida', width: 14 },
+        { header: 'Fecha entrada', key: 'fecha_entrada', width: 14 },
+        { header: 'Hora entrada', key: 'entrada', width: 13 },
+        { header: 'Fecha salida', key: 'fecha_salida', width: 14 },
+        { header: 'Hora salida', key: 'salida', width: 13 },
+        { header: 'Minutos dentro', key: 'minutos', width: 15 },
         { header: 'Método', key: 'metodo', width: 14 },
       ]
 
@@ -138,14 +175,16 @@ export default function Auditoria() {
       })
       hoja.getRow(1).height = 22
 
-      datos.forEach(i => {
+      paraExportar.forEach(i => {
         const fila = hoja.addRow({
           identificacion: i.identificacion || '',
           nombre: i.nombre || '',
           vinculo: vinculoLegible(i.tipo_persona),
-          fecha: i.fecha || '',
+          fecha_entrada: i.fecha_entrada || '',
           entrada: i.hora_entrada || '',
+          fecha_salida: i.fecha_salida || '',
           salida: i.hora_salida || 'Sin salida',
+          minutos: i.minutos_dentro ?? '',
           metodo: i.metodo === 'liveness' ? 'Persona viva' : (i.metodo || ''),
         })
         if (!i.hora_salida) {
@@ -155,7 +194,7 @@ export default function Auditoria() {
 
       // Deja la fila de encabezados como filtro, que es lo que vuelve
       // utilizable un reporte de varios cientos de filas.
-      hoja.autoFilter = { from: 'A1', to: `F${datos.length + 1}` }
+      hoja.autoFilter = { from: 'A1', to: `I${paraExportar.length + 1}` }
 
       const buffer = await libro.xlsx.writeBuffer()
       const blob = new Blob([buffer], {
@@ -366,9 +405,11 @@ export default function Auditoria() {
           {/* STATS */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
-              { num: datos.length, lbl: 'Total', color: 'var(--blue)' },
-              { num: datos.filter(i => i.hora_salida).length, lbl: 'Con salida', color: '#2e7d32' },
-              { num: datos.filter(i => !i.hora_salida).length, lbl: 'Sin salida', color: '#c62828' }
+              { num: visibles.length, lbl: 'Visitas', color: 'var(--blue)' },
+              { num: personas, lbl: 'Personas', color: '#4B2D8F' },
+              // Sin salida no es un dato que falte: significa que esa
+              // persona figura como que sigue adentro.
+              { num: visibles.filter(i => !i.hora_salida).length, lbl: 'Sin salida', color: '#c62828' }
             ].map((s, i) => (
               <div key={i} style={{ background: 'rgba(255,255,255,0.92)', borderRadius: 14, padding: '14px 8px', textAlign: 'center', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' }}>
                 <div style={{ fontSize: 26, fontWeight: 900, color: s.color }}>{s.num}</div>
@@ -400,39 +441,86 @@ export default function Auditoria() {
               <button onClick={cargarAuditoria} disabled={loading} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--orange)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
                 {loading ? 'Buscando...' : 'Buscar'}
               </button>
-              <button onClick={exportarExcel} disabled={exportando || !datos.length} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: exportando ? 'wait' : 'pointer', opacity: (exportando || !datos.length) ? 0.5 : 1 }}>
+              <button onClick={exportarExcel} disabled={exportando || !visibles.length} style={{ flex: 1, padding: 12, border: 'none', borderRadius: 14, background: 'var(--blue)', color: 'white', fontFamily: 'Nunito, sans-serif', fontSize: 13, fontWeight: 800, cursor: exportando ? 'wait' : 'pointer', opacity: (exportando || !visibles.length) ? 0.5 : 1 }}>
                 {exportando ? 'Generando...' : 'Exportar a Excel'}
               </button>
             </div>
 
             {errorCarga && <Aviso tipo="error" style={{ marginBottom: 14 }}>{errorCarga}</Aviso>}
 
+            {datos.length > 0 && (
+              <div style={{ position: 'relative', marginBottom: 12 }}>
+                <Search size={16} aria-hidden="true"
+                  style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: '#888', pointerEvents: 'none' }} />
+                <input
+                  type="search"
+                  value={busqueda}
+                  onChange={e => setBusqueda(e.target.value)}
+                  placeholder="Buscar por cédula o nombre"
+                  aria-label="Buscar por cédula o nombre"
+                  style={{ ...inputStyle, padding: '11px 12px 11px 38px', fontSize: 13 }}
+                />
+              </div>
+            )}
+
             {datos.length === 0
               ? <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', fontSize: 14 }}>
                   {loading ? 'Cargando registros…' : 'No hay registros en este período'}
+                </div>
+              : visibles.length === 0
+              // El buscador solo ve el rango que se consultó. Sin este
+              // aviso, buscar a alguien que estuvo en agosto con el
+              // filtro en esta semana parece decir que no existe.
+              ? <div style={{ textAlign: 'center', padding: '36px 20px', color: '#888' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#666' }}>
+                    Nadie coincide con «{busqueda}»
+                  </div>
+                  <div style={{ fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+                    La búsqueda mira solo las fechas consultadas.<br />
+                    Si la persona entró antes, amplía el rango y vuelve a buscar.
+                  </div>
                 </div>
               : <div style={{ overflowX: 'auto', borderRadius: 14 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr>
-                        {['Identificación', 'Nombre', 'Vínculo', 'Fecha', 'Entrada', 'Salida'].map((h, i, arr) => (
+                        {['Identificación', 'Nombre', 'Vínculo', 'Entrada', 'Salida', 'Tiempo'].map((h, i, arr) => (
                           <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {datos.map((item, i) => (
+                      {visibles.map((item, i) => {
+                        // La fecha de salida solo se muestra cuando es
+                        // otra: repetirla en cada fila es ruido, pero
+                        // esconderla cuando la visita cruzó la medianoche
+                        // haría leer mal la hora.
+                        const otroDia = item.fecha_salida && item.fecha_salida !== item.fecha_entrada
+                        return (
                         <tr key={i}>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', fontWeight: 700 }}>{item.identificacion || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>{item.nombre || '-'}</td>
                           <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#666' }}>{vinculoLegible(item.tipo_persona) || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>{item.fecha || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#2e7d32', fontWeight: 600 }}>{item.hora_entrada || '-'}</td>
-                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: item.hora_salida ? '#c62828' : '#888', fontWeight: item.hora_salida ? 600 : 400 }}>
-                            {item.hora_salida || 'Sin salida'}
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>
+                            <div style={{ color: '#2e7d32', fontWeight: 600 }}>{item.hora_entrada || '-'}</div>
+                            <div style={{ fontSize: 11, color: '#999' }}>{item.fecha_entrada || ''}</div>
+                          </td>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>
+                            {item.hora_salida
+                              ? <>
+                                  <div style={{ color: '#c62828', fontWeight: 600 }}>{item.hora_salida}</div>
+                                  {otroDia && <div style={{ fontSize: 11, color: '#c62828' }}>{item.fecha_salida}</div>}
+                                </>
+                              : <span style={{ background: '#fff3e0', color: '#e65100', border: '1px solid #ffb74d', borderRadius: 20, padding: '3px 9px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                                  Sin salida
+                                </span>}
+                          </td>
+                          <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#555', whiteSpace: 'nowrap' }}>
+                            {duracionLegible(item.minutos_dentro) || '-'}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

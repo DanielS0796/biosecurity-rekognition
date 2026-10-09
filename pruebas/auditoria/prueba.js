@@ -37,7 +37,7 @@ dyn.__estado.accesos = [
 ];
 let r = await pedir({ format: 'json' });
 check('queda un solo registro, no dos', r.json.items.length === 1, `-> ${r.json.items.length}`);
-check('con la fecha local del turno', r.json.items[0]?.fecha === '2026-10-06', r.json.items[0]?.fecha);
+check('con la fecha local del turno', r.json.items[0]?.fecha_entrada === '2026-10-06', r.json.items[0]?.fecha_entrada);
 check('entrada a las 14:00', r.json.items[0]?.hora_entrada === '14:00', r.json.items[0]?.hora_entrada);
 check('salida a las 20:00', r.json.items[0]?.hora_salida === '20:00', r.json.items[0]?.hora_salida);
 
@@ -218,10 +218,52 @@ check('sin categoría queda vacío, no inventado', porId['202']?.tipo_persona ==
   JSON.stringify(porId['202']?.tipo_persona));
 
 const csv = (await pedir({ format: 'csv' })).body;
-check('el CSV lleva la columna', /"Identificacion";"Nombre";"Vinculo";"Fecha"/.test(csv),
+check('el CSV lleva la columna', /"Identificacion";"Nombre";"Vinculo";"Fecha Entrada"/.test(csv),
   csv.split('\n')[0]);
 check('con el valor en su sitio', /"Luz Mena";"docente"/.test(csv),
   csv.split('\n').find(l => l.includes('Luz Mena')));
+
+console.log('\n── La salida trae su propia fecha ──');
+// Una visita puede cruzar la medianoche local: quien entra a las 23:00
+// sale al día siguiente. Con una sola columna "Fecha" había que adivinar
+// a cuál de las dos horas correspondía.
+reset();
+dyn.__estado.accesos = [
+  acceso('100', 'Ana', '2026-10-07T04:00:00Z', 'ENTRADA'),  // 23:00 del 6
+  acceso('100', 'Ana', '2026-10-07T06:30:00Z', 'SALIDA'),   // 01:30 del 7
+];
+r = await pedir({ format: 'json' });
+check('una sola visita', r.json.items.length === 1, `-> ${r.json.items.length}`);
+check('entra el 6', r.json.items[0]?.fecha_entrada === '2026-10-06', r.json.items[0]?.fecha_entrada);
+check('a las 23:00', r.json.items[0]?.hora_entrada === '23:00', r.json.items[0]?.hora_entrada);
+check('y sale el 7', r.json.items[0]?.fecha_salida === '2026-10-07', r.json.items[0]?.fecha_salida);
+check('a la 01:30', r.json.items[0]?.hora_salida === '01:30', r.json.items[0]?.hora_salida);
+
+console.log('\n── Los minutos dentro se calculan, no se escriben ──');
+check('dos horas y media son 150 minutos',
+  r.json.items[0]?.minutos_dentro === 150, r.json.items[0]?.minutos_dentro);
+
+reset();
+dyn.__estado.accesos = [acceso('100', 'Ana', '2026-10-06T14:00:00Z', 'ENTRADA')];
+r = await pedir({ format: 'json' });
+check('sin salida no son cero minutos, son ninguno',
+  r.json.items[0]?.minutos_dentro === null, JSON.stringify(r.json.items[0]));
+check('y la fecha de salida queda vacía',
+  r.json.items[0]?.fecha_salida === '', JSON.stringify(r.json.items[0]));
+
+console.log('\n── El CSV lleva las columnas nuevas ──');
+reset();
+dyn.__estado.accesos = [
+  acceso('100', 'Ana', '2026-10-06T13:00:00Z', 'ENTRADA'),
+  acceso('100', 'Ana', '2026-10-06T14:30:00Z', 'SALIDA'),
+];
+const csvNuevo = (await pedir({})).body;
+check('el encabezado separa las dos fechas',
+  /"Fecha Entrada";"Hora Entrada";"Fecha Salida";"Hora Salida";"Minutos Dentro"/.test(csvNuevo),
+  csvNuevo.split('\n')[0]);
+check('y la fila trae los noventa minutos',
+  /"2026-10-06";"08:00";"2026-10-06";"09:30";"90"/.test(csvNuevo),
+  csvNuevo.split('\n')[1]);
 
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
