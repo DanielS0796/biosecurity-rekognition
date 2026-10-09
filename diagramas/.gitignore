@@ -4,3 +4,6 @@
 #
 # Si hace falta uno para la tesis, se corre el script y se exporta.
 *.png
+
+# El entorno virtual con la librería diagrams, si se instala así.
+.venv/
