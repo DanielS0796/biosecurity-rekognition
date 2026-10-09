@@ -1,6 +1,18 @@
 # ─────────────────────────────────────────
-# WAF delante de los APIs
+# WAF delante de los APIs — NO APLICADO
 # ─────────────────────────────────────────
+# Decisión del 8 de octubre de 2026: queda escrito pero sin aplicar,
+# para no encimarlo con la migración de los APIs el mismo día.
+#
+# Mientras no se aplique no cuesta nada y no filtra nada. Se activa con
+# ./desplegar-waf.sh, que es el único camino pensado para esto.
+#
+# Ojo con una vía involuntaria: los scripts del proyecto aplican con
+# -target y por eso no lo tocan, pero un `terraform apply` sin -target
+# sí crearía el web ACL y lo asociaría a los tres APIs de gestión,
+# porque los recursos están declarados acá. Si corres un apply pelado,
+# revisa el plan antes de aceptarlo.
+#
 # Hasta ahora la única puerta de los APIs era la API key, y una llave que
 # viaja en el JavaScript del navegador la puede leer cualquiera que abra
 # las herramientas de desarrollo. Eso no se arregla con un WAF, pero el
