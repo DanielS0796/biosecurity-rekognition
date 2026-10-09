@@ -604,11 +604,40 @@ resource "aws_api_gateway_api_key" "rrhh_key" {
   enabled = true
 }
 
+# El plan de uso es lo que hace válida la API key en una etapa. La
+# asociación vive en AWS contra la etapa concreta, no contra el nombre
+# "prod": cuando un cambio en los triggers reemplaza el despliegue, la
+# etapa se borra y se vuelve a crear, y la asociación se queda por el
+# camino. Terraform no lo nota porque en su configuración nada cambió:
+# sigue diciendo "prod".
+#
+# El síntoma es desconcertante —200 justo después del apply y 403 unos
+# minutos más tarde— porque API Gateway guarda un rato la decisión sobre
+# la llave antes de volver a consultarla.
+#
+# replace_triggered_by vuelve a crear el plan cada vez que el despliegue
+# se reemplaza, que es lo único que restablece la asociación. Si alguna
+# vez hay que arreglarlo a mano:
+#
+#   terraform apply -auto-approve \
+#     -replace=aws_api_gateway_usage_plan.rrhh_plan \
+#     -target=aws_api_gateway_usage_plan.rrhh_plan \
+#     -target=aws_api_gateway_usage_plan_key.rrhh_plan_key
+#
+# La cura de fondo es declarar la etapa como aws_api_gateway_stage
+# aparte, que es lo que Terraform viene pidiendo en los avisos de
+# obsolescencia: así la etapa sobrevive a los despliegues y nada de esto
+# pasa. Eso toca la etapa de liveness, que es producción, así que va en
+# su propio momento y no a mitad de una migración.
 resource "aws_api_gateway_usage_plan" "rrhh_plan" {
   name = "biosecurity-rrhh-plan"
   api_stages {
     api_id = aws_api_gateway_rest_api.api_rrhh.id
     stage  = aws_api_gateway_deployment.rrhh_deployment.stage_name
+  }
+
+  lifecycle {
+    replace_triggered_by = [aws_api_gateway_deployment.rrhh_deployment]
   }
 }
 
@@ -752,6 +781,10 @@ resource "aws_api_gateway_usage_plan" "auditoria_plan" {
   api_stages {
     api_id = aws_api_gateway_rest_api.api_auditoria.id
     stage  = aws_api_gateway_deployment.auditoria_deployment.stage_name
+  }
+
+  lifecycle {
+    replace_triggered_by = [aws_api_gateway_deployment.auditoria_deployment]
   }
 }
 
