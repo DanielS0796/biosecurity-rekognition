@@ -12,50 +12,27 @@ provider "aws" {
 }
 
 # ─────────────────────────────────────────
-# S3
+# Aquí vivía el hosting anterior a Amplify
 # ─────────────────────────────────────────
-resource "aws_s3_bucket" "frontend" {
-  bucket = "buckebiosecurity"
-}
-
-resource "aws_s3_bucket_website_configuration" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-  index_document { suffix = "index.html" }
-}
-
-resource "aws_s3_bucket_public_access_block" "frontend" {
-  bucket                  = aws_s3_bucket.frontend.id
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
-}
-
-resource "aws_s3_bucket_policy" "frontend_public" {
-  bucket = aws_s3_bucket.frontend.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Sid       = "PublicReadGetObject"
-      Effect    = "Allow"
-      Principal = "*"
-      Action    = "s3:GetObject"
-      Resource  = "${aws_s3_bucket.frontend.arn}/*"
-    }]
-  })
-  depends_on = [aws_s3_bucket_public_access_block.frontend]
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.biosecurity.arn
-    }
-    bucket_key_enabled = true
-  }
-}
+# Un bucket de S3 llamado buckebiosecurity sirviendo el sitio estático,
+# con su política de lectura pública, el bloqueo de acceso público
+# desactivado en las cuatro opciones, y una distribución de CloudFront
+# por delante. Más dos outputs, cloudfront_url y s3_website_url.
+#
+# El frontend vive en Amplify desde que pasó a Next.js. Estos recursos
+# quedaron declarados pero nunca existieron en la cuenta: los dos
+# outputs devolvían null, que era la señal.
+#
+# Se borran por el mismo motivo que /best/validar: un `terraform apply`
+# sin -target los habría creado. Eso significa un bucket de lectura
+# pública y una distribución de CloudFront que nadie necesita, cobrando
+# todos los meses y sirviendo una copia vacía de la aplicación, porque
+# nada en el repositorio sube archivos ahí.
+#
+# No hizo falta destruir nada en AWS, solo quitarlos de acá.
+#
+# La llave KMS se queda: la usan el bucket de evidencias de liveness y
+# las tablas de DynamoDB.
 
 # ─────────────────────────────────────────
 # KMS
@@ -743,50 +720,6 @@ resource "aws_lambda_permission" "apigw_auditoria" {
 }
 
 # ─────────────────────────────────────────
-# CloudFront
-# ─────────────────────────────────────────
-resource "aws_cloudfront_distribution" "frontend" {
-  enabled             = true
-  default_root_object = "index.html"
-  price_class         = "PriceClass_100"
-
-  origin {
-    domain_name = aws_s3_bucket_website_configuration.frontend.website_endpoint
-    origin_id   = "s3-frontend"
-    custom_origin_config {
-      http_port              = 80
-      https_port             = 443
-      origin_protocol_policy = "http-only"
-      origin_ssl_protocols   = ["TLSv1.2"]
-    }
-  }
-
-  default_cache_behavior {
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "s3-frontend"
-    viewer_protocol_policy = "redirect-to-https"
-    forwarded_values {
-      query_string = false
-      cookies { forward = "none" }
-    }
-    min_ttl     = 0
-    default_ttl = 300
-    max_ttl     = 1200
-  }
-
-  restrictions {
-    geo_restriction { restriction_type = "none" }
-  }
-
-  viewer_certificate {
-    cloudfront_default_certificate = true
-  }
-
-  tags = { Project = "anlusoft-rekognition" }
-}
-
-# ─────────────────────────────────────────
 # Cognito
 # ─────────────────────────────────────────
 resource "aws_cognito_user_pool" "biosecurity" {
@@ -834,11 +767,6 @@ output "api_auditoria_url" {
   description = "URL reporte auditoria"
 }
 
-output "cloudfront_url" {
-  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
-  description = "URL HTTPS del sistema"
-}
-
 output "rrhh_api_key" {
   value       = aws_api_gateway_api_key.rrhh_key.value
   sensitive   = true
@@ -849,10 +777,6 @@ output "auditoria_api_key" {
   value       = aws_api_gateway_api_key.auditoria_key.value
   sensitive   = true
   description = "API Key auditoria"
-}
-
-output "s3_website_url" {
-  value = aws_s3_bucket_website_configuration.frontend.website_endpoint
 }
 
 output "lambda_name" {
