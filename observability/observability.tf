@@ -53,12 +53,12 @@ resource "aws_sns_topic_subscription" "email_alert" {
 # ─────────────────────────────────────────
 # CloudWatch Alarms (error rate > 5%)
 # ─────────────────────────────────────────
-resource "aws_cloudwatch_metric_alarm" "validacion_errors" {
-  alarm_name          = "biosecurity-validacion-error-rate"
+resource "aws_cloudwatch_metric_alarm" "liveness_errors" {
+  alarm_name          = "biosecurity-liveness-error-rate"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
   threshold           = 5
-  alarm_description   = "Validacion Lambda error rate > 5% in 5 minutes"
+  alarm_description   = "Liveness Lambda error rate > 5% in 5 minutes"
   alarm_actions       = [aws_sns_topic.alerts.arn]
   treat_missing_data  = "notBreaching"
 
@@ -76,7 +76,7 @@ resource "aws_cloudwatch_metric_alarm" "validacion_errors" {
       namespace   = "AWS/Lambda"
       period      = 300
       stat        = "Sum"
-      dimensions  = { FunctionName = "validacionderostros" }
+      dimensions  = { FunctionName = "biosecurity-liveness-detection" }
     }
   }
 
@@ -87,7 +87,7 @@ resource "aws_cloudwatch_metric_alarm" "validacion_errors" {
       namespace   = "AWS/Lambda"
       period      = 300
       stat        = "Sum"
-      dimensions  = { FunctionName = "validacionderostros" }
+      dimensions  = { FunctionName = "biosecurity-liveness-detection" }
     }
   }
 }
@@ -224,7 +224,7 @@ resource "aws_cloudwatch_dashboard" "biosecurity" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/Lambda", "Invocations", "FunctionName", "validacionderostros"],
+            ["AWS/Lambda", "Invocations", "FunctionName", "biosecurity-liveness-detection"],
             [".", ".", ".", "biosecurity-registrar-empleado"],
             [".", ".", ".", "biosecurity-auditoria"],
             [".", ".", ".", "biosecurity-reset"]
@@ -244,7 +244,7 @@ resource "aws_cloudwatch_dashboard" "biosecurity" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/Lambda", "Errors", "FunctionName", "validacionderostros"],
+            ["AWS/Lambda", "Errors", "FunctionName", "biosecurity-liveness-detection"],
             [".", ".", ".", "biosecurity-registrar-empleado"],
             [".", ".", ".", "biosecurity-auditoria"],
             [".", ".", ".", "biosecurity-reset"]
@@ -264,7 +264,7 @@ resource "aws_cloudwatch_dashboard" "biosecurity" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/Lambda", "Duration", "FunctionName", "validacionderostros", { stat = "p95" }],
+            ["AWS/Lambda", "Duration", "FunctionName", "biosecurity-liveness-detection", { stat = "p95" }],
             ["...", "biosecurity-registrar-empleado", { stat = "p95" }],
             ["...", "biosecurity-auditoria", { stat = "p95" }],
             ["...", "biosecurity-reset", { stat = "p95" }]
@@ -283,7 +283,7 @@ resource "aws_cloudwatch_dashboard" "biosecurity" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/Lambda", "Duration", "FunctionName", "validacionderostros", { stat = "p99" }],
+            ["AWS/Lambda", "Duration", "FunctionName", "biosecurity-liveness-detection", { stat = "p99" }],
             ["...", "biosecurity-registrar-empleado", { stat = "p99" }],
             ["...", "biosecurity-auditoria", { stat = "p99" }],
             ["...", "biosecurity-reset", { stat = "p99" }]
@@ -302,7 +302,7 @@ resource "aws_cloudwatch_dashboard" "biosecurity" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/Lambda", "Throttles", "FunctionName", "validacionderostros"],
+            ["AWS/Lambda", "Throttles", "FunctionName", "biosecurity-liveness-detection"],
             [".", ".", ".", "biosecurity-registrar-empleado"],
             [".", ".", ".", "biosecurity-auditoria"],
             [".", ".", ".", "biosecurity-reset"]
