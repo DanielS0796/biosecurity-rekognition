@@ -346,3 +346,65 @@ output "cloudwatch_dashboard_url" {
   value       = "https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=${aws_cloudwatch_dashboard.biosecurity.dashboard_name}"
   description = "CloudWatch dashboard URL"
 }
+
+# ─────────────────────────────────────────
+# Alarmas que la tasa de errores no ve
+# ─────────────────────────────────────────
+# Una solicitud estrangulada (throttle) nunca llega a ejecutar la función,
+# así que no suma en Invocations ni en Errors: solo sube Throttles.
+resource "aws_cloudwatch_metric_alarm" "liveness_throttles" {
+  alarm_name          = "biosecurity-liveness-throttles"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 0
+  alarm_description   = "Liveness Lambda throttled at least once in 5 minutes"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  metric_name = "Throttles"
+  namespace   = "AWS/Lambda"
+  period      = 300
+  statistic   = "Sum"
+  dimensions  = { FunctionName = "biosecurity-liveness-detection" }
+}
+
+# Los 500 que la función atrapa en su try/catch cuentan como invocaciones
+# exitosas para Lambda. API Gateway sí los ve, igual que los throttles.
+resource "aws_cloudwatch_metric_alarm" "liveness_api_5xx" {
+  alarm_name          = "biosecurity-liveness-api-5xx-rate"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 5
+  alarm_description   = "Liveness API 5XX rate > 5% in 5 minutes"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id          = "tasa_5xx"
+    expression  = "(e5xx / total) * 100"
+    label       = "5XX Rate"
+    return_data = true
+  }
+
+  metric_query {
+    id = "e5xx"
+    metric {
+      metric_name = "5XXError"
+      namespace   = "AWS/ApiGateway"
+      period      = 300
+      stat        = "Sum"
+      dimensions  = { ApiName = "biosecurity-liveness-api", Stage = "prod" }
+    }
+  }
+
+  metric_query {
+    id = "total"
+    metric {
+      metric_name = "Count"
+      namespace   = "AWS/ApiGateway"
+      period      = 300
+      stat        = "Sum"
+      dimensions  = { ApiName = "biosecurity-liveness-api", Stage = "prod" }
+    }
+  }
+}
