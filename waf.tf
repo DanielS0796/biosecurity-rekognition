@@ -35,7 +35,7 @@
 
 resource "aws_wafv2_web_acl" "apis" {
   name        = "biosecurity-apis"
-  description = "Protege los APIs de registro, auditoría, autenticación y liveness"
+  description = "Protege los APIs de registro, auditoria, autenticacion y liveness"
   scope       = "REGIONAL"
 
   default_action {
@@ -233,19 +233,38 @@ data "aws_region" "actual" {}
 
 # Estos tres todavía no reciben tráfico: si una regla se equivoca, se ve
 # con curl y no en la cara de nadie.
+# Cuando un cambio reemplaza el despliegue de un API, la etapa "prod" se
+# borra y se vuelve a crear, y AWS suelta la asociación con el WAF junto
+# con ella. Terraform no lo nota porque el ARN que arma con el nombre de
+# la etapa sigue siendo el mismo, y el API quedaría sin firewall sin que
+# ningún plan lo muestre. Es el mismo problema de los planes de uso
+# (ver main.tf), y se resuelve igual: la asociación se vuelve a crear
+# cada vez que se reemplaza el despliegue.
 resource "aws_wafv2_web_acl_association" "rrhh" {
   resource_arn = local.etapa_arn.rrhh
   web_acl_arn  = aws_wafv2_web_acl.apis.arn
+
+  lifecycle {
+    replace_triggered_by = [aws_api_gateway_deployment.rrhh_deployment]
+  }
 }
 
 resource "aws_wafv2_web_acl_association" "auditoria" {
   resource_arn = local.etapa_arn.auditoria
   web_acl_arn  = aws_wafv2_web_acl.apis.arn
+
+  lifecycle {
+    replace_triggered_by = [aws_api_gateway_deployment.auditoria_deployment]
+  }
 }
 
 resource "aws_wafv2_web_acl_association" "reset" {
   resource_arn = local.etapa_arn.reset
   web_acl_arn  = aws_wafv2_web_acl.apis.arn
+
+  lifecycle {
+    replace_triggered_by = [aws_api_gateway_deployment.reset_deployment]
+  }
 }
 
 # Liveness es el único de los cuatro que ya sirve producción: es la
@@ -259,6 +278,10 @@ resource "aws_wafv2_web_acl_association" "liveness" {
 
   resource_arn = local.etapa_arn.liveness
   web_acl_arn  = aws_wafv2_web_acl.apis.arn
+
+  lifecycle {
+    replace_triggered_by = [aws_api_gateway_deployment.liveness_deployment]
+  }
 }
 
 output "waf_web_acl" {
