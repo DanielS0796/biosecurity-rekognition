@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
+import { API_AUDITORIA, API_RESET } from '../config'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 import { ArrowLeft, BarChart3, RefreshCw, ScanFace, Search, ShieldCheck, Users } from 'lucide-react'
 import Aviso from '../components/Aviso'
@@ -161,7 +161,7 @@ export default function Auditoria() {
       if (fechaDesde) params.set('desde', fechaDesde)
       if (fechaHasta) params.set('hasta', fechaHasta)
 
-      const r = await fetch(`${API_AUDITORIA}?${params}`, { headers: conSesion({ 'x-api-key': API_KEY_AUD }) })
+      const r = await fetch(`${API_AUDITORIA}?${params}`, { headers: conSesion() })
       revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
@@ -193,7 +193,7 @@ export default function Auditoria() {
       // desde que el sistema existe, que es justo lo que se necesita
       // cuando alguien pregunta por un caso concreto.
       const r = await fetch(`${API_AUDITORIA}?format=json`, {
-        headers: conSesion({ 'x-api-key': API_KEY_AUD }),
+        headers: conSesion(),
       })
       revisarSesion(r)
       const data = await r.json()

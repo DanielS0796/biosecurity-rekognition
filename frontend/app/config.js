@@ -34,5 +34,7 @@ export const API_LIVENESS_RESULT =
 export const API_RRHH_URL  = "https://jfshekzwbl.execute-api.us-east-1.amazonaws.com/prod/registrar";
 export const API_AUDITORIA = "https://sdvymkutn7.execute-api.us-east-1.amazonaws.com/prod/reporte";
 export const API_RESET     = "https://qwnsrgtar9.execute-api.us-east-1.amazonaws.com/prod/reset";
-export const API_KEY_RRHH  = "0LLZzFXzuPZ1KcMiKGkH6AvSDzN9Y0p3OOzEVrcc";
-export const API_KEY_AUD   = "aYpCNw1m5S10zsPNhR7ao7PLLyoYTd6R6iVwTG6b";
+// Acá vivían las llaves de API de RR. HH. y auditoría. Viajaban en este
+// archivo, es decir, en el JavaScript que descarga cualquier navegador.
+// Desde el 25 de octubre de 2026 esas APIs no las piden: lo que protege
+// cada acción es el token de sesión que entrega el inicio de sesión.

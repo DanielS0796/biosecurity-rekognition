@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { API_RRHH_URL, API_RESET, API_KEY_RRHH } from '../config'
+import { API_RRHH_URL, API_RESET } from '../config'
 import LivenessScan from '../components/LivenessScan'
 import CambioClaveObligatorio from '../components/CambioClaveObligatorio'
 import ConsentimientoDatos from '../components/ConsentimientoDatos'
@@ -243,7 +243,7 @@ export default function RRHH() {
     setBuscarLoading(true)
     setEmpleadoEncontrado(null)
     try {
-      const r = await fetch(`${API_RRHH_URL}?identificacion=${eliminarId}`, { headers: conSesion({ 'x-api-key': API_KEY_RRHH }) })
+      const r = await fetch(`${API_RRHH_URL}?identificacion=${eliminarId}`, { headers: conSesion() })
       revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
@@ -264,7 +264,7 @@ export default function RRHH() {
     try {
       const r = await fetch(API_RRHH_URL, {
         method: 'DELETE',
-        headers: conSesion({ 'Content-Type': 'application/json', 'x-api-key': API_KEY_RRHH }),
+        headers: conSesion({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ identificacion: eliminarId })
       })
       revisarSesion(r)
@@ -288,7 +288,7 @@ export default function RRHH() {
     if (mostrarActivos) { setMostrarActivos(false); return }
     setActivosLoading(true)
     try {
-      const r = await fetch(`${API_RRHH_URL}?tipo=activos`, { headers: conSesion({ 'x-api-key': API_KEY_RRHH }) })
+      const r = await fetch(`${API_RRHH_URL}?tipo=activos`, { headers: conSesion() })
       revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
@@ -302,7 +302,7 @@ export default function RRHH() {
     if (mostrarRetirados) { setMostrarRetirados(false); return }
     setRetiradosLoading(true)
     try {
-      const r = await fetch(`${API_RRHH_URL}?tipo=retirados`, { headers: conSesion({ 'x-api-key': API_KEY_RRHH }) })
+      const r = await fetch(`${API_RRHH_URL}?tipo=retirados`, { headers: conSesion() })
       revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data

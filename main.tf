@@ -410,12 +410,24 @@ resource "aws_api_gateway_resource" "rrhh_root" {
   path_part   = "registrar"
 }
 
+# Llaves de API: retiradas el 25 de octubre de 2026.
+#
+# RR. HH. y auditoría exigían una llave de API, y la llave viajaba en el
+# JavaScript del navegador: cualquiera que abriera las herramientas de
+# desarrollo la tenía (riesgo R19). Era una barrera de papel. Desde que
+# cada Lambda exige una sesión firmada con el rol correspondiente
+# (lambda/sesion.js), esa sesión es la protección y la llave no agrega
+# nada, así que se deja de pedir y se borra del frontend.
+#
+# Lo que la llave hacía de verdad, ponerle tope al tráfico con su plan de
+# uso, lo hace ahora un límite de solicitudes en cada etapa (más abajo) y
+# el WAF, que tiene su límite por IP.
 resource "aws_api_gateway_method" "rrhh_post" {
   rest_api_id      = aws_api_gateway_rest_api.api_rrhh.id
   resource_id      = aws_api_gateway_resource.rrhh_root.id
   http_method      = "POST"
   authorization    = "NONE"
-  api_key_required = true
+  api_key_required = false
 }
 
 resource "aws_api_gateway_integration" "rrhh_lambda" {
@@ -436,7 +448,7 @@ resource "aws_api_gateway_method" "rrhh_get" {
   resource_id      = aws_api_gateway_resource.rrhh_root.id
   http_method      = "GET"
   authorization    = "NONE"
-  api_key_required = true
+  api_key_required = false
 }
 
 resource "aws_api_gateway_integration" "rrhh_get" {
@@ -453,7 +465,7 @@ resource "aws_api_gateway_method" "rrhh_delete" {
   resource_id      = aws_api_gateway_resource.rrhh_root.id
   http_method      = "DELETE"
   authorization    = "NONE"
-  api_key_required = true
+  api_key_required = false
 }
 
 resource "aws_api_gateway_integration" "rrhh_delete" {
@@ -542,6 +554,7 @@ resource "aws_api_gateway_deployment" "rrhh_deployment" {
       aws_api_gateway_integration.rrhh_options,
       aws_api_gateway_method_response.rrhh_options_200,
       aws_api_gateway_integration_response.rrhh_options,
+      aws_api_gateway_gateway_response.rrhh_limitado,
     ]))
   }
 
@@ -555,52 +568,46 @@ resource "aws_api_gateway_deployment" "rrhh_deployment" {
   ]
 }
 
-resource "aws_api_gateway_api_key" "rrhh_key" {
-  name    = "biosecurity-rrhh-key"
-  enabled = true
-}
+# Aquí vivían la llave de API de RR. HH., su plan de uso y la asociación
+# entre los dos. Se retiraron con la llave (ver el comentario de
+# rrhh_post). El plan de uso además arrastraba un problema propio: se
+# soltaba de la etapa en cada redespliegue y había que recrearlo con
+# replace_triggered_by. Sin llave, desaparece también eso.
 
-# El plan de uso es lo que hace válida la API key en una etapa. La
-# asociación vive en AWS contra la etapa concreta, no contra el nombre
-# "prod": cuando un cambio en los triggers reemplaza el despliegue, la
-# etapa se borra y se vuelve a crear, y la asociación se queda por el
-# camino. Terraform no lo nota porque en su configuración nada cambió:
-# sigue diciendo "prod".
-#
-# El síntoma es desconcertante —200 justo después del apply y 403 unos
-# minutos más tarde— porque API Gateway guarda un rato la decisión sobre
-# la llave antes de volver a consultarla.
-#
-# replace_triggered_by vuelve a crear el plan cada vez que el despliegue
-# se reemplaza, que es lo único que restablece la asociación. Si alguna
-# vez hay que arreglarlo a mano:
-#
-#   terraform apply -auto-approve \
-#     -replace=aws_api_gateway_usage_plan.rrhh_plan \
-#     -target=aws_api_gateway_usage_plan.rrhh_plan \
-#     -target=aws_api_gateway_usage_plan_key.rrhh_plan_key
-#
-# La cura de fondo es declarar la etapa como aws_api_gateway_stage
-# aparte, que es lo que Terraform viene pidiendo en los avisos de
-# obsolescencia: así la etapa sobrevive a los despliegues y nada de esto
-# pasa. Eso toca la etapa de liveness, que es producción, así que va en
-# su propio momento y no a mitad de una migración.
-resource "aws_api_gateway_usage_plan" "rrhh_plan" {
-  name = "biosecurity-rrhh-plan"
-  api_stages {
-    api_id = aws_api_gateway_rest_api.api_rrhh.id
-    stage  = aws_api_gateway_deployment.rrhh_deployment.stage_name
+# Tope de solicitudes de la etapa, en reemplazo del plan de uso. RR. HH.
+# lo usan unas pocas personas a la vez; 5 por segundo con ráfagas de 10
+# sobra para ellas y deja la cuenta lejos del tope de 10 Lambdas
+# simultáneas, que comparte con la API de acceso.
+resource "aws_api_gateway_method_settings" "rrhh_limite" {
+  rest_api_id = aws_api_gateway_rest_api.api_rrhh.id
+  stage_name  = aws_api_gateway_deployment.rrhh_deployment.stage_name
+  method_path = "*/*"
+
+  settings {
+    throttling_rate_limit  = 5
+    throttling_burst_limit = 10
   }
 
+  # Vive en la etapa, que se recrea con cada despliegue (ver waf.tf).
   lifecycle {
     replace_triggered_by = [aws_api_gateway_deployment.rrhh_deployment]
   }
 }
 
-resource "aws_api_gateway_usage_plan_key" "rrhh_plan_key" {
-  key_id        = aws_api_gateway_api_key.rrhh_key.id
-  key_type      = "API_KEY"
-  usage_plan_id = aws_api_gateway_usage_plan.rrhh_plan.id
+# El 429 que arma API Gateway no pasa por la Lambda y no lleva CORS: sin
+# esta cabecera el navegador lo descarta y la pantalla dice "error de
+# conexión" en lugar de "espere un momento".
+resource "aws_api_gateway_gateway_response" "rrhh_limitado" {
+  rest_api_id   = aws_api_gateway_rest_api.api_rrhh.id
+  response_type = "THROTTLED"
+  status_code   = "429"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin" = "'*'"
+  }
+  response_templates = {
+    "application/json" = jsonencode({ codigo = 1, descripcion = "Hay demasiadas solicitudes en este momento. Espere unos segundos e intente de nuevo." })
+  }
 }
 
 # El identificador lleva sufijo -tf a propósito. En los Lambdas ya hay
@@ -642,7 +649,7 @@ resource "aws_api_gateway_method" "auditoria_get" {
   resource_id      = aws_api_gateway_resource.auditoria_root.id
   http_method      = "GET"
   authorization    = "NONE"
-  api_key_required = true
+  api_key_required = false
 }
 
 resource "aws_api_gateway_integration" "auditoria_lambda" {
@@ -716,6 +723,7 @@ resource "aws_api_gateway_deployment" "auditoria_deployment" {
       aws_api_gateway_integration.auditoria_options,
       aws_api_gateway_method_response.auditoria_options_200,
       aws_api_gateway_integration_response.auditoria_options,
+      aws_api_gateway_gateway_response.auditoria_limitado,
     ]))
   }
 
@@ -727,16 +735,17 @@ resource "aws_api_gateway_deployment" "auditoria_deployment" {
   ]
 }
 
-resource "aws_api_gateway_api_key" "auditoria_key" {
-  name    = "biosecurity-auditoria-key"
-  enabled = true
-}
+# Aquí vivían la llave de API de auditoría, su plan de uso y la
+# asociación entre los dos. Se retiraron con la llave (ver rrhh_post).
 
-resource "aws_api_gateway_usage_plan" "auditoria_plan" {
-  name = "biosecurity-auditoria-plan"
-  api_stages {
-    api_id = aws_api_gateway_rest_api.api_auditoria.id
-    stage  = aws_api_gateway_deployment.auditoria_deployment.stage_name
+resource "aws_api_gateway_method_settings" "auditoria_limite" {
+  rest_api_id = aws_api_gateway_rest_api.api_auditoria.id
+  stage_name  = aws_api_gateway_deployment.auditoria_deployment.stage_name
+  method_path = "*/*"
+
+  settings {
+    throttling_rate_limit  = 5
+    throttling_burst_limit = 10
   }
 
   lifecycle {
@@ -744,10 +753,17 @@ resource "aws_api_gateway_usage_plan" "auditoria_plan" {
   }
 }
 
-resource "aws_api_gateway_usage_plan_key" "auditoria_plan_key" {
-  key_id        = aws_api_gateway_api_key.auditoria_key.id
-  key_type      = "API_KEY"
-  usage_plan_id = aws_api_gateway_usage_plan.auditoria_plan.id
+resource "aws_api_gateway_gateway_response" "auditoria_limitado" {
+  rest_api_id   = aws_api_gateway_rest_api.api_auditoria.id
+  response_type = "THROTTLED"
+  status_code   = "429"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin" = "'*'"
+  }
+  response_templates = {
+    "application/json" = jsonencode({ codigo = 1, descripcion = "Hay demasiadas solicitudes en este momento. Espere unos segundos e intente de nuevo." })
+  }
 }
 
 resource "aws_lambda_permission" "apigw_auditoria" {
@@ -804,18 +820,6 @@ output "api_rrhh_url" {
 output "api_auditoria_url" {
   value       = "https://${aws_api_gateway_rest_api.api_auditoria.id}.execute-api.us-east-1.amazonaws.com/prod/reporte"
   description = "URL reporte auditoria"
-}
-
-output "rrhh_api_key" {
-  value       = aws_api_gateway_api_key.rrhh_key.value
-  sensitive   = true
-  description = "API Key RRHH"
-}
-
-output "auditoria_api_key" {
-  value       = aws_api_gateway_api_key.auditoria_key.value
-  sensitive   = true
-  description = "API Key auditoria"
 }
 
 output "lambda_name" {

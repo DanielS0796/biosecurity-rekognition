@@ -14,14 +14,12 @@
 
 set -uo pipefail
 
-LLAVE_RRHH="$(terraform output -raw rrhh_api_key 2>/dev/null)"
-LLAVE_AUD="$(terraform output -raw auditoria_api_key 2>/dev/null)"
 URL_RRHH="$(terraform output -raw api_rrhh_url 2>/dev/null)"
 URL_AUD="$(terraform output -raw api_auditoria_url 2>/dev/null)"
 URL_RESET="$(terraform output -raw api_reset_url 2>/dev/null)"
 URL_LIVENESS="$(terraform output -raw api_liveness_init_url 2>/dev/null)"
 
-for v in LLAVE_RRHH LLAVE_AUD URL_RRHH URL_AUD URL_RESET URL_LIVENESS; do
+for v in URL_RRHH URL_AUD URL_RESET URL_LIVENESS; do
   if [ -z "${!v}" ]; then
     echo "No se pudo leer $v de los outputs de Terraform."
     echo "Corre el script desde la raíz del repositorio, después del apply."
@@ -61,17 +59,20 @@ echo "────────────────────────�
 echo " Sesión firmada: lo administrativo sin token se rechaza"
 echo "──────────────────────────────────────────────────"
 
-echo "Recursos Humanos (con llave de API, sin token)"
+# Desde que se retiraron las llaves de API, estas llamadas van sin llave.
+# Un 401 (y no un 403 de API Gateway) confirma las dos cosas a la vez: que
+# la API ya no pide llave y que la Lambda sí pide sesión.
+echo "Recursos Humanos (sin llave y sin token)"
 esperar 401 "listar personas activas" \
-  -H "x-api-key: ${LLAVE_RRHH}" "${URL_RRHH}?tipo=activos"
+  "${URL_RRHH}?tipo=activos"
 esperar 401 "retirar una persona" \
-  -X DELETE -H 'Content-Type: application/json' -H "x-api-key: ${LLAVE_RRHH}" \
+  -X DELETE -H 'Content-Type: application/json' \
   -d '{"identificacion":"0"}' "$URL_RRHH"
 
 echo
-echo "Auditoría (con llave de API, sin token)"
+echo "Auditoría (sin llave y sin token)"
 esperar 401 "reporte de accesos" \
-  -H "x-api-key: ${LLAVE_AUD}" "${URL_AUD}?format=json"
+  "${URL_AUD}?format=json"
 
 echo
 echo "Administración de usuarios (sin token)"
@@ -109,8 +110,9 @@ if [ "$fallos" -eq 0 ]; then
   echo "auditoría desde la aplicación y usar cada pantalla una vez."
 else
   echo "$fallos comprobación(es) fallaron. Si un 401 sale 200, esa Lambda"
-  echo "sigue con el código anterior; si sale 403, API Gateway rechazó la"
-  echo "llave o el despliegue todavía no se propagó (hasta 5 minutos)."
+  echo "sigue con el código anterior; si sale 403 en RR. HH. o auditoría,"
+  echo "la API todavía pide llave: el despliegue no se ha propagado (hasta"
+  echo "5 minutos) o el apply no quitó api_key_required."
 fi
 echo "──────────────────────────────────────────────────"
 exit $([ "$fallos" -eq 0 ] && echo 0 || echo 1)
