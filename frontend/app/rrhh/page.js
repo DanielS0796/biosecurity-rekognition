@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { API_RRHH_URL, API_RESET, API_KEY_RRHH } from '../config'
@@ -32,6 +32,35 @@ export default function RRHH() {
   // Quien entra con una contraseña temporal no pasa al sistema: primero
   // la cambia. Se guarda la temporal para poder probar el cambio.
   const [cambioPendiente, setCambioPendiente] = useState(null)
+  // Token de la sesión que entrega el servidor al iniciar sesión. Vive solo
+  // en memoria: recargar la página cierra la sesión, como ya pasaba, y no
+  // queda nada guardado en el navegador que otro script pueda leer. Es un
+  // ref y no un estado porque las llamadas que siguen al login se hacen
+  // en el mismo ciclo, antes de que un estado alcance a actualizarse.
+  const tokenRef = useRef(null)
+  // Copia en estado para pasársela al escaneo de registro: un componente
+  // hijo no debe leer un ref durante el render.
+  const [tokenSesion, setTokenSesion] = useState(null)
+  function guardarToken(t) {
+    tokenRef.current = t
+    setTokenSesion(t)
+  }
+
+  // Cabeceras de toda llamada que exige sesión.
+  function conSesion(extra = {}) {
+    return tokenRef.current ? { ...extra, Authorization: `Bearer ${tokenRef.current}` } : extra
+  }
+
+  // El servidor responde 401 cuando el token venció, lo alteraron o el
+  // usuario ya no existe. Se vuelve al login en vez de dejar la pantalla
+  // fallando en cada clic.
+  function revisarSesion(r) {
+    if (r.status !== 401) return
+    guardarToken(null)
+    setLogueado(false)
+    setLoginPass('')
+    setLoginError('Su sesión venció o ya no es válida. Inicie sesión de nuevo.')
+  }
 
   const [identificacion, setIdentificacion] = useState('')
   const [nombre, setNombre] = useState('')
@@ -118,6 +147,7 @@ export default function RRHH() {
       if (body.codigo === 0 && body.debe_cambiar_clave) {
         setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
       } else if (body.codigo === 0 && body.rol.includes('rrhh')) {
+        guardarToken(body.token || null)
         setLogueado(true)
         setUsuarioActual(loginUser)
         setTimeout(() => { cargarUsuarios() }, 500)
@@ -136,6 +166,7 @@ export default function RRHH() {
   }
 
   function logout() {
+    guardarToken(null)
     setLogueado(false)
     setLoginPass('')
     setLoginUser('')
@@ -212,7 +243,8 @@ export default function RRHH() {
     setBuscarLoading(true)
     setEmpleadoEncontrado(null)
     try {
-      const r = await fetch(`${API_RRHH_URL}?identificacion=${eliminarId}`, { headers: { 'x-api-key': API_KEY_RRHH } })
+      const r = await fetch(`${API_RRHH_URL}?identificacion=${eliminarId}`, { headers: conSesion({ 'x-api-key': API_KEY_RRHH }) })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0 && body.nombre) {
@@ -232,9 +264,10 @@ export default function RRHH() {
     try {
       const r = await fetch(API_RRHH_URL, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY_RRHH },
+        headers: conSesion({ 'Content-Type': 'application/json', 'x-api-key': API_KEY_RRHH }),
         body: JSON.stringify({ identificacion: eliminarId })
       })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
@@ -255,7 +288,8 @@ export default function RRHH() {
     if (mostrarActivos) { setMostrarActivos(false); return }
     setActivosLoading(true)
     try {
-      const r = await fetch(`${API_RRHH_URL}?tipo=activos`, { headers: { 'x-api-key': API_KEY_RRHH } })
+      const r = await fetch(`${API_RRHH_URL}?tipo=activos`, { headers: conSesion({ 'x-api-key': API_KEY_RRHH }) })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       setActivos(body.items || [])
@@ -268,7 +302,8 @@ export default function RRHH() {
     if (mostrarRetirados) { setMostrarRetirados(false); return }
     setRetiradosLoading(true)
     try {
-      const r = await fetch(`${API_RRHH_URL}?tipo=retirados`, { headers: { 'x-api-key': API_KEY_RRHH } })
+      const r = await fetch(`${API_RRHH_URL}?tipo=retirados`, { headers: conSesion({ 'x-api-key': API_KEY_RRHH }) })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       setRetirados(body.items || [])
@@ -289,7 +324,7 @@ export default function RRHH() {
     try {
       const r = await fetch(API_RESET, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: conSesion({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           accion: 'crear_usuario',
           usuario: nuevoUsuario.trim(),
@@ -297,6 +332,7 @@ export default function RRHH() {
           rol: nuevoRoles.join(','),
         })
       })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
@@ -333,14 +369,15 @@ export default function RRHH() {
     try {
       const r = await fetch(API_RESET, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // Quién hace el cambio lo sabe el servidor por el token.
+        headers: conSesion({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           accion: 'cambiar_roles',
           usuario,
           rol: roles.join(','),
-          usuario_actual: usuarioActual,
         }),
       })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) {
@@ -367,9 +404,10 @@ export default function RRHH() {
     try {
       const r = await fetch(API_RESET, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: conSesion({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ accion: 'listar_usuarios' })
       })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       setUsuarios(body.items || [])
@@ -382,9 +420,10 @@ export default function RRHH() {
     try {
       const r = await fetch(API_RESET, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accion: 'eliminar_usuario', usuario, usuario_actual: usuarioActual })
+        headers: conSesion({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ accion: 'eliminar_usuario', usuario })
       })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       if (body.codigo === 0) { playSound('success'); cargarUsuarios() }
@@ -458,14 +497,18 @@ export default function RRHH() {
     <CambioClaveObligatorio
       usuario={cambioPendiente.usuario}
       claveActual={cambioPendiente.clave}
-      onListo={(roles) => {
+      onListo={(roles, token) => {
         const usuario = cambioPendiente.usuario
         setCambioPendiente(null)
         setLoginPass('')
-        if (roles.includes('rrhh')) {
+        if (roles.includes('rrhh') && token) {
+          guardarToken(token)
           setLogueado(true)
           setUsuarioActual(usuario)
           setTimeout(() => { cargarUsuarios() }, 500)
+        } else if (roles.includes('rrhh')) {
+          // La contraseña quedó cambiada pero el servidor no entregó sesión.
+          setLoginError('Contraseña actualizada. Inicie sesión con la nueva.')
         } else {
           alert('Contraseña actualizada. Su usuario no tiene permiso para este módulo.')
         }
@@ -668,6 +711,7 @@ export default function RRHH() {
                   tipoPersona={tipoPersona}
                   autorizacion={autorizacion}
                   sinDestellos={sinDestellos}
+                  token={tokenSesion}
                   onExito={registroExitoso}
                   onFallo={registroFallido}
                   onCancelar={cancelarEscaneo}

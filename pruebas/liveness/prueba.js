@@ -1,12 +1,33 @@
+const SECRETO = 'secreto-de-prueba-con-mas-de-32-caracteres';
+process.env.SESION_SECRETO = SECRETO;
 require('./preparar.js');
 const rek = require('@aws-sdk/client-rekognition');
 const dyn = require('@aws-sdk/client-dynamodb');
 const mail = require('nodemailer');
 process.env.BUCKET_AUDITORIA = '';
 const { handler } = require('./liveness.actual.js');
+const firmaSesion = require('./sesion.js');
 
-const ev = (ruta, cuerpo) => ({ path: ruta, httpMethod: 'POST', body: JSON.stringify(cuerpo) });
-const post = async (ruta, cuerpo) => { const r = await handler(ev(ruta, cuerpo)); return { status: r.statusCode, body: JSON.parse(r.body || '{}') }; };
+// Registrar exige sesión de RR. HH.; el rol se lee de la tabla de usuarios.
+dyn.__estado.tablas['biosecurity-usuarios'] = {
+  jefa: { email: { S: 'jefa' }, rol: { S: 'rrhh' } },
+  auditor: { email: { S: 'auditor' }, rol: { S: 'auditoria' } },
+};
+const TOKEN_RRHH = firmaSesion.emitir('jefa').token;
+
+// post() firma como RR. HH. solo los inicios de registro, que es lo que hace
+// el módulo de RR. HH. La validación de la portería va sin sesión, como en
+// la realidad. Con un tercer argumento se manda el token que se indique
+// (null: ninguno).
+const ev = (ruta, cuerpo, token) => ({
+  path: ruta, httpMethod: 'POST', body: JSON.stringify(cuerpo),
+  headers: token ? { Authorization: `Bearer ${token}` } : {},
+});
+const post = async (ruta, cuerpo, ...token) => {
+  const t = token.length ? token[0] : (cuerpo?.proposito === 'registro' && ruta.endsWith('/liveness-init') ? TOKEN_RRHH : null);
+  const r = await handler(ev(ruta, cuerpo, t));
+  return { status: r.statusCode, body: JSON.parse(r.body || '{}') };
+};
 
 let pasaron = 0, fallaron = 0;
 function check(nombre, cond, detalle='') {
@@ -351,6 +372,43 @@ reset(); limpiarAccesos(); conPersona();
 await escanear('s-v1', '2026-10-06T13:00:00Z');
 const hoy = await escanear('s-v2', '2026-10-08T13:00:00Z');
 check('dos días después vuelve a ser entrada', hoy.body.tipo_acceso === 'ENTRADA', hoy.body.tipo_acceso);
+
+console.log('\n── Sesión: registrar una cara exige RR. HH. (R09/R20) ──');
+// Antes, cualquiera que conociera la URL podía abrir un registro y dar de
+// alta su propia cara con la identidad que quisiera.
+reset();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-sesion-1' };
+const pedidoRegistro = { proposito: 'registro', identificacion: '777', nombre: 'Intruso', ...AUTORIZA };
+let rs = await post('/liveness-init', pedidoRegistro, null);
+check('registro sin token -> 401', rs.status === 401, `-> ${rs.status}`);
+check('no abre sesión en Rekognition', !rek.__estado.llamadas.some(l => l.tipo === 'CreateFaceLivenessSessionCommand'));
+check('ni la guarda', !dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-sesion-1']);
+
+rs = await post('/liveness-init', pedidoRegistro, firmaSesion.emitir('auditor').token);
+check('registro con sesión de auditoría -> 403', rs.status === 403, `-> ${rs.status}`);
+
+rs = await post('/liveness-init', pedidoRegistro, firmaSesion.emitir('jefa', Date.now() - 9 * 3600 * 1000).token);
+check('registro con token vencido -> 401', rs.status === 401, `-> ${rs.status}`);
+
+const [hh, pp] = TOKEN_RRHH.split('.');
+rs = await post('/liveness-init', pedidoRegistro, `${hh}.${pp}.alterada`);
+check('registro con firma alterada -> 401', rs.status === 401, `-> ${rs.status}`);
+
+rs = await post('/liveness-init', pedidoRegistro, TOKEN_RRHH);
+check('con sesión de RR. HH. abre el registro', rs.status === 200 && rs.body.session_id === 's-sesion-1', `-> ${rs.status}`);
+check('la sesión guarda quién lo pidió',
+  dyn.__estado.tablas['biosecurity-liveness-sessions']?.['s-sesion-1']?.registrado_por?.S === 'jefa');
+
+reset();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-porteria' };
+rs = await post('/liveness-init', { proposito: 'validacion' }, null);
+check('la validación de la portería sigue sin sesión', rs.status === 200 && rs.body.session_id === 's-porteria', `-> ${rs.status}`);
+// Si alguien manda "registro" mal escrito, cae en validación, que no da de
+// alta a nadie.
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-raro' };
+rs = await post('/liveness-init', { proposito: 'REGISTRO', identificacion: '777', nombre: 'X' }, null);
+check('un propósito raro no se vuelve registro',
+  rs.body.proposito === 'validacion', JSON.stringify(rs.body));
 
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);

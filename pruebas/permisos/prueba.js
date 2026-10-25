@@ -66,12 +66,30 @@ function lambdasDeclarados() {
     return lista;
 }
 
-/** Comandos de DynamoDB que aparecen instanciados en un archivo. */
-function comandosUsados(ruta) {
+/**
+ * Archivos locales que un handler carga con require("./x.js"), siguiendo
+ * la cadena. Desde que existe sesion.js, un handler usa DynamoDB también
+ * a través de otro archivo, y mirar solo el handler dejaría ese uso fuera.
+ */
+function archivosDe(ruta, vistos = new Set()) {
+    if (vistos.has(ruta)) return vistos;
+    vistos.add(ruta);
     const codigo = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
+    for (const m of codigo.matchAll(/require\(\s*["']\.\/([\w.-]+?)(?:\.js)?["']\s*\)/g)) {
+        const dep = `lambda/${m[1]}.js`;
+        if (fs.existsSync(path.join(RAIZ, dep))) archivosDe(dep, vistos);
+    }
+    return vistos;
+}
+
+/** Comandos de DynamoDB que aparecen instanciados en un handler y lo que carga. */
+function comandosUsados(ruta) {
     const usados = new Set();
-    for (const comando of Object.keys(ACCION)) {
-        if (new RegExp(`new\\s+${comando}\\s*\\(`).test(codigo)) usados.add(comando);
+    for (const archivo of archivosDe(ruta)) {
+        const codigo = fs.readFileSync(path.join(RAIZ, archivo), "utf8");
+        for (const comando of Object.keys(ACCION)) {
+            if (new RegExp(`new\\s+${comando}\\s*\\(`).test(codigo)) usados.add(comando);
+        }
     }
     return usados;
 }
@@ -145,10 +163,36 @@ for (const { recurso, codigo } of lambdasDeclarados()) {
     }
 }
 
-// Aviso, no fallo: archivos en lambda/ que no son el handler de nadie.
-// Viajan dentro de todos los zips porque se empaqueta la carpeta entera,
-// así que conviene saber que están, pero no corren y no bloquean nada.
-const handlers = new Set(lambdasDeclarados().map(l => path.basename(l.codigo)));
+// sesion.js lee la tabla de usuarios desde las cuatro Lambdas. Todas
+// comparten el rol lambda_role, así que basta con que alguna política de
+// ese rol conceda GetItem sobre esa tabla. Esto sí mira el ARN, porque es
+// justo el caso que la comparación por acciones no ve: dynamo_policy
+// concede GetItem, pero sobre otras tablas.
+const usanSesion = lambdasDeclarados()
+    .filter(l => fs.existsSync(path.join(RAIZ, l.codigo)) && archivosDe(l.codigo).has("lambda/sesion.js"));
+if (usanSesion.length) {
+    const tf = ["main.tf", "liveness-iam.tf"].map(a => fs.readFileSync(path.join(RAIZ, a), "utf8")).join("\n");
+    const bloques = [...tf.matchAll(/resource\s+"aws_iam_role_policy"\s+"[^"]+"\s*\{([\s\S]*?)\n\}/g)]
+        .map(m => m[1].split("\n").filter(l => !l.trim().startsWith("#")).join("\n"));
+    const concede = bloques.some(b =>
+        /role\s*=\s*aws_iam_role\.lambda_role\.id/.test(b) &&
+        b.includes('"dynamodb:GetItem"') &&
+        b.includes("aws_dynamodb_table.usuarios.arn"));
+    if (concede) {
+        console.log(`  ✓ sesion.js — GetItem sobre la tabla de usuarios (${usanSesion.map(l => l.recurso).join(", ")})`);
+    } else {
+        console.log("  ✗ sesion.js lee la tabla de usuarios y ninguna política de lambda_role lo permite");
+        fallos++;
+    }
+}
+
+// Aviso, no fallo: archivos en lambda/ que no son el handler de nadie ni
+// los carga ninguno. Viajan dentro de todos los zips porque se empaqueta
+// la carpeta entera, así que conviene saber que están, pero no corren.
+const cargados = new Set(lambdasDeclarados()
+    .filter(l => fs.existsSync(path.join(RAIZ, l.codigo)))
+    .flatMap(l => [...archivosDe(l.codigo)].map(a => path.basename(a))));
+const handlers = new Set([...lambdasDeclarados().map(l => path.basename(l.codigo)), ...cargados]);
 const sueltos = fs.readdirSync(path.join(RAIZ, "lambda"))
     .filter(n => n.endsWith(".js") && !handlers.has(n) && n !== "instrument.js");
 if (sueltos.length) {

@@ -28,3 +28,8 @@ fs.copyFileSync(
   path.join(__dirname, '..', '..', 'lambda', 'liveness.js'),
   path.join(__dirname, 'liveness.actual.js')
 );
+// El Lambda hace require('./sesion.js'), así que va al lado de la copia.
+fs.copyFileSync(
+  path.join(__dirname, '..', '..', 'lambda', 'sesion.js'),
+  path.join(__dirname, 'sesion.js')
+);

@@ -40,6 +40,7 @@ const {
     QueryCommand,
 } = require("@aws-sdk/client-dynamodb");
 const crypto = require("crypto");
+const sesion = require("./sesion.js");
 
 const rekognition = new RekognitionClient({ region: process.env.AWS_REGION || "us-east-1" });
 const dynamo = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
@@ -110,7 +111,7 @@ const DESAFIO_VALIDACION = process.env.DESAFIO_VALIDACION || "FaceMovementChalle
 
 const CORS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
+    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key,Authorization",
     "Access-Control-Allow-Methods": "POST,OPTIONS",
 };
 
@@ -153,7 +154,15 @@ async function iniciarLiveness(event) {
     const tipoPersona = normalizarTipo(body.tipo_persona);
     const autorizacion = body.autorizacion || {};
 
+    // El registro crea una identidad que después abre la puerta, así que solo
+    // lo puede pedir Recursos Humanos con sesión. La validación de la
+    // portería sigue sin sesión: ahí quien se identifica es la cara.
+    let registradoPor = "-";
     if (proposito === "registro") {
+        const quien = await sesion.exigir(event, "rrhh", { log });
+        if (!quien.ok) return responder(quien.status, { codigo: 1, descripcion: quien.descripcion });
+        registradoPor = quien.usuario;
+
         if (!identificacion || !nombre) {
             return responder(400, {
                 codigo: 1,
@@ -230,11 +239,13 @@ async function iniciarLiveness(event) {
             autorizacion_fecha: { S: new Date().toISOString() },
             politica_version: { S: proposito === "registro" ? POLITICA_VERSION : "-" },
             autorizacion_canal: { S: (autorizacion.canal || "app-web").slice(0, 40) },
+            registrado_por: { S: registradoPor },
         },
     }));
 
     log("INFO", "Sesión de liveness creada", {
         sessionId, proposito, identificacion, desafio, sin_destellos: sinDestellos,
+        ...(proposito === "registro" ? { por: registradoPor } : {}),
     });
 
     return responder(200, { codigo: 0, session_id: sessionId, proposito, desafio });

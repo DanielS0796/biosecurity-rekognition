@@ -5,13 +5,14 @@ const Sentry = require("@sentry/aws-serverless");
 const { RekognitionClient, IndexFacesCommand, DeleteFacesCommand, SearchFacesByImageCommand } = require("@aws-sdk/client-rekognition");
 const { DynamoDBClient, PutItemCommand, GetItemCommand, DeleteItemCommand, ScanCommand } = require("@aws-sdk/client-dynamodb");
 const crypto = require("crypto");
+const sesion = require("./sesion.js");
 
 const rekognition = new RekognitionClient({ region: "us-east-1" });
 const dynamo = new DynamoDBClient({ region: "us-east-1" });
 
 const CORS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
+    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key,Authorization",
     "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS"
 };
 
@@ -31,6 +32,14 @@ exports.handler = Sentry.wrapHandler(async (event) => {
 
     if (event.httpMethod === "OPTIONS") {
         return { statusCode: 200, headers: CORS, body: "" };
+    }
+
+    // Todo lo de esta API es de Recursos Humanos: consultar, registrar y
+    // retirar personas. La llave de API sola no basta, porque viaja en el
+    // código del navegador y la puede copiar cualquiera.
+    const quien = await sesion.exigir(event, "rrhh", { log });
+    if (!quien.ok) {
+        return { statusCode: quien.status, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: quien.descripcion }) };
     }
 
     if (event.httpMethod === "GET") {
@@ -142,7 +151,7 @@ exports.handler = Sentry.wrapHandler(async (event) => {
                 Key: { identificacion: { S: identificacion } }
             }));
 
-            log("INFO", "Empleado eliminado", { identificacion, nombre });
+            log("INFO", "Empleado eliminado", { identificacion, nombre, por: quien.usuario });
 
             return {
                 statusCode: 200, headers: CORS,
@@ -258,7 +267,7 @@ exports.handler = Sentry.wrapHandler(async (event) => {
             }
         }));
 
-        log("INFO", "Empleado registrado", { identificacion, nombre, duration_ms: Date.now() - startTime });
+        log("INFO", "Empleado registrado", { identificacion, nombre, por: quien.usuario, duration_ms: Date.now() - startTime });
 
         return {
             statusCode: 200, headers: CORS,

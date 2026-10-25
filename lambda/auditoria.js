@@ -3,6 +3,7 @@ require("./instrument.js");
 const Sentry = require("@sentry/aws-serverless");
 
 const { DynamoDBClient, ScanCommand } = require("@aws-sdk/client-dynamodb");
+const sesion = require("./sesion.js");
 
 const dynamo = new DynamoDBClient({ region: "us-east-1" });
 
@@ -15,7 +16,7 @@ const ZONA = process.env.ZONA_HORARIA || "America/Bogota";
 
 const CORS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
+    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key,Authorization",
     "Access-Control-Allow-Methods": "GET,OPTIONS"
 };
 
@@ -257,6 +258,13 @@ exports.handler = Sentry.wrapHandler(async (event) => {
         return { statusCode: 200, headers: CORS, body: "" };
     }
 
+    // El reporte trae nombres, identificaciones y horarios de personas
+    // reales: solo lo ve quien tiene el rol de auditoría.
+    const quien = await sesion.exigir(event, "auditoria", { log });
+    if (!quien.ok) {
+        return { statusCode: quien.status, headers: CORS, body: JSON.stringify({ codigo: 1, descripcion: quien.descripcion }) };
+    }
+
     try {
         const desde = esFecha(q.desde) ? q.desde : null;
         const hasta = esFecha(q.hasta) ? q.hasta : null;
@@ -277,6 +285,7 @@ exports.handler = Sentry.wrapHandler(async (event) => {
         });
 
         log("INFO", "Auditoria completada", {
+            por: quien.usuario,
             escaneados: items.length,
             registros: registros.length,
             desde, hasta,

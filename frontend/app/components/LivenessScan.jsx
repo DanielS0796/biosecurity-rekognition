@@ -145,6 +145,9 @@ export default function LivenessScan({
   // transporta.
   autorizacion = null,
   sinDestellos = false,
+  // Sesión de quien registra. El registro la exige en el servidor; la
+  // validación de la portería no la lleva.
+  token = null,
   onExito,
   onFallo,
   onCancelar,
@@ -197,7 +200,10 @@ export default function LivenessScan({
 
         const r = await fetch(API_LIVENESS_INIT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({
             proposito, identificacion, nombre, correo,
             tipo_persona: tipoPersona,
@@ -224,7 +230,7 @@ export default function LivenessScan({
     // Rekognition cada vez.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposito, identificacion, nombre, correo, tipoPersona, sinDestellos,
-      autorizacion?.autorizado, autorizacion?.politica_version])
+      autorizacion?.autorizado, autorizacion?.politica_version, token])
 
   // Rekognition terminó de analizar el video. Le pedimos el veredicto al
   // backend, que es el único que puede consultarlo.

@@ -33,7 +33,8 @@ resource "aws_lambda_function" "liveness" {
   memory_size      = 512
 
   environment {
-    variables = {
+    # Merge con la sesión: el registro facial exige la de RR. HH.
+    variables = merge(local.sesion, {
       TABLE_LIVENESS   = aws_dynamodb_table.liveness_sessions.name
       TABLE_EMPLEADOS  = aws_dynamodb_table.empleados.name
       TABLE_RETIRADOS  = aws_dynamodb_table.retirados.name
@@ -60,7 +61,7 @@ resource "aws_lambda_function" "liveness" {
       # Para la constancia que se le envía a la persona registrada.
       SMTP_USUARIO = var.smtp_usuario
       SMTP_CLAVE   = var.smtp_clave
-    }
+    })
   }
 
   tags = { Project = "anlusoft-rekognition" }

@@ -62,3 +62,15 @@ variable "proteger_liveness" {
   type        = bool
   default     = false
 }
+
+variable "sesion_secreto" {
+  description = "Secreto con el que se firman las sesiones (HMAC-SHA256). Se genera con: openssl rand -hex 32"
+  type        = string
+  sensitive   = true
+  # Sin valor por defecto a propósito: si falta, terraform plan se detiene
+  # en vez de desplegar unas Lambdas que rechazarían todo inicio de sesión.
+  validation {
+    condition     = length(var.sesion_secreto) >= 32
+    error_message = "sesion_secreto debe tener al menos 32 caracteres. Genera uno con: openssl rand -hex 32"
+  }
+}

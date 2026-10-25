@@ -1,4 +1,4 @@
-const estado = { accesos: [], empleados: {}, retirados: {}, scans: [] };
+const estado = { accesos: [], empleados: {}, retirados: {}, scans: [], usuarios: {} };
 class Cmd { constructor(i){ this.input = i; this.tipo = this.constructor.name; } }
 class ScanCommand extends Cmd {}
 class GetItemCommand extends Cmd {}
@@ -44,6 +44,8 @@ class DynamoDBClient {
     }
     if (cmd.tipo === 'GetItemCommand') {
       const id = Object.values(cmd.input.Key)[0].S;
+      // La sesión revisa el rol de quien llama en la tabla de usuarios.
+      if ((cmd.input.TableName || '').includes('usuarios')) return { Item: estado.usuarios[id] };
       const v = estado.empleados[id];
       const nombre = typeof v === 'string' ? v : v?.nombre;
       return { Item: nombre ? { identificacion: { S: id }, nombre: { S: nombre } } : undefined };

@@ -3,6 +3,9 @@ process.env.SMTP_USUARIO = 'buzon@prueba.test';
 process.env.SMTP_CLAVE = 'clave-doble';
 process.env.ADMIN_EMERGENCIA_USUARIO = 'rescate';
 process.env.ADMIN_EMERGENCIA_CORREO = 'rescate@prueba.test';
+// Secreto de prueba para firmar sesiones. El real vive en terraform.tfvars.
+const SECRETO = 'secreto-de-prueba-con-mas-de-32-caracteres';
+process.env.SESION_SECRETO = SECRETO;
 
 require('./preparar.js');
 const crypto = require('crypto');
@@ -19,14 +22,29 @@ process.env.ADMIN_EMERGENCIA_HASH = hashear('Rescate2026!Ok');
 const dyn = require('@aws-sdk/client-dynamodb');
 const mail = require('nodemailer');
 const { handler } = require('./reset.actual.js');
+const sesion = require('./sesion.js');
 
 let pasaron = 0, fallaron = 0;
 const check = (n, c, d = '') => {
   if (c) { console.log(`  ✓ ${n}`); pasaron++; }
   else { console.log(`  ✗ ${n} ${d}`); fallaron++; }
 };
-const pedir = async (body) => {
-  const r = await handler({ httpMethod: 'POST', body: JSON.stringify(body) });
+// Las acciones de administración exigen sesión. Para no reescribir las
+// pruebas anteriores, pedir() firma un token a nombre de usuario_actual
+// (o del admin de emergencia si no viene). El servidor ya no lee
+// usuario_actual del cuerpo: lo saca del token, que es lo que se prueba
+// en la sección 23. Con { token } se manda exactamente lo que se indique,
+// y con { token: null } no se manda nada.
+const PROTEGIDAS = ['crear_usuario', 'cambiar_roles', 'eliminar_usuario', 'listar_usuarios'];
+const tokenDe = (usuario) => sesion.emitir(usuario).token;
+const pedir = async (body, opciones = {}) => {
+  const headers = {};
+  if ('token' in opciones) {
+    if (opciones.token) headers.Authorization = `Bearer ${opciones.token}`;
+  } else if (PROTEGIDAS.includes(body.accion)) {
+    headers.Authorization = `Bearer ${tokenDe(body.usuario_actual || 'rescate')}`;
+  }
+  const r = await handler({ httpMethod: 'POST', headers, body: JSON.stringify(body) });
   return { status: r.statusCode, body: JSON.parse(r.body || '{}') };
 };
 const reset = () => {
@@ -171,8 +189,11 @@ check('entra con la clave de la variable', r.body.codigo === 0, JSON.stringify(r
 check('con ambos roles', JSON.stringify(r.body.rol) === '["rrhh","auditoria"]');
 r = await pedir({ accion: 'login', email: 'rescate', clave: 'clave123' });
 check('la clave vieja del código ya no sirve', r.status === 401);
+// Quien lo intenta tiene que existir y tener registro; si no, el 401 de la
+// sesión taparía la regla que se quiere probar.
+dyn.__estado.usuarios['ana'] = { email: { S: 'ana' }, password: { S: 'scrypt$1$1$1$aa$bb' }, rol: { S: 'rrhh' } };
 r = await pedir({ accion: 'eliminar_usuario', usuario: 'rescate', usuario_actual: 'ana' });
-check('no se puede eliminar', r.body.codigo === 1, r.body.descripcion);
+check('no se puede eliminar', r.status === 400 && /emergencia/.test(r.body.descripcion), r.body.descripcion);
 
 console.log('\n── 12. Roles inválidos no se cuelan ──');
 reset();
@@ -305,9 +326,13 @@ check('y no toca lo guardado', dyn.__estado.usuarios['beto'].rol.S === 'auditori
 r = await pedir({ accion: 'cambiar_roles', usuario: 'ana', rol: 'auditoria', usuario_actual: 'ana' });
 check('no te puedes quitar registro a ti mismo', r.status === 400, r.body.descripcion);
 
-// ana es la única con rrhh (beto quedó en auditoria): quitárselo desde
-// otra cuenta dejaría el sistema sin nadie que administre usuarios.
+// beto quedó solo con auditoría, así que ya no puede administrar usuarios.
 r = await pedir({ accion: 'cambiar_roles', usuario: 'ana', rol: 'auditoria', usuario_actual: 'beto' });
+check('quien solo tiene auditoría no cambia roles', r.status === 403, `-> ${r.status} ${r.body.descripcion}`);
+
+// ana es la única con rrhh en la base: quitárselo, aunque lo pida el
+// admin de emergencia, dejaría el sistema sin nadie que administre usuarios.
+r = await pedir({ accion: 'cambiar_roles', usuario: 'ana', rol: 'auditoria', usuario_actual: 'rescate' });
 check('tampoco al último con registro', r.status === 400, r.body.descripcion);
 check('ana conserva su rol', dyn.__estado.usuarios['ana'].rol.S === 'rrhh');
 
@@ -370,6 +395,118 @@ r = await pedir({ accion: 'cambiar_roles', usuario: 'rescate', rol: 'auditoria',
 check('ya sin registro, vuelve a estar protegido', r.status === 400, r.body.descripcion);
 r = await pedir({ accion: 'eliminar_usuario', usuario: 'rescate', usuario_actual: 'otro' });
 check('tampoco se elimina el de la variable', r.status === 400, r.body.descripcion);
+
+console.log('\n── 23. Sesión firmada: el servidor decide quién administra (R09) ──');
+// Antes de este cambio el servidor no preguntaba quién llamaba: bastaba con
+// conocer la URL para crear usuarios, cambiar roles o borrarlos.
+reset();
+dyn.__estado.usuarios['jefa'] = {
+  email: { S: 'jefa' }, password: { S: hashear(CLAVE_OK) }, correo_reset: { S: 'j@x.test' },
+  rol: { S: 'rrhh' }, debe_cambiar_clave: { BOOL: false },
+};
+dyn.__estado.usuarios['auditor'] = {
+  email: { S: 'auditor' }, password: { S: hashear(CLAVE_OK) }, correo_reset: { S: 'a@x.test' },
+  rol: { S: 'auditoria' }, debe_cambiar_clave: { BOOL: false },
+};
+
+// El login entrega la sesión.
+r = await pedir({ accion: 'login', email: 'jefa', clave: CLAVE_OK });
+check('el login entrega un token', typeof r.body.token === 'string' && r.body.token.split('.').length === 3,
+  JSON.stringify(r.body).slice(0, 80));
+check('y dice cuándo vence', typeof r.body.expira === 'number' && r.body.expira * 1000 > Date.now());
+const tokenJefa = r.body.token;
+r = await pedir({ accion: 'listar_usuarios' }, { token: tokenJefa });
+check('con ese token administra', r.status === 200 && r.body.codigo === 0, `-> ${r.status}`);
+
+// Sin token, ninguna acción de administración pasa.
+for (const [accion, extra] of [
+  ['listar_usuarios', {}],
+  ['crear_usuario', { usuario: 'intruso', correo: 'i@x.test', rol: 'rrhh,auditoria' }],
+  ['cambiar_roles', { usuario: 'auditor', rol: 'rrhh,auditoria' }],
+  ['eliminar_usuario', { usuario: 'jefa' }],
+]) {
+  r = await pedir({ accion, ...extra }, { token: null });
+  check(`${accion} sin token -> 401`, r.status === 401, `-> ${r.status}`);
+}
+check('y no se tocó nada', !dyn.__estado.usuarios['intruso'] && !!dyn.__estado.usuarios['jefa']
+  && dyn.__estado.usuarios['auditor'].rol.S === 'auditoria');
+check('ni salió ningún correo', mail.__enviados.length === 0);
+
+// Tokens falsificados.
+const [h, p, f] = tokenJefa.split('.');
+const cuerpo = JSON.parse(Buffer.from(p, 'base64url').toString());
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const firmar = (datos, clave) => crypto.createHmac('sha256', clave).update(datos).digest('base64url');
+
+const otroUsuario = `${h}.${b64({ ...cuerpo, sub: 'auditor' })}.${f}`;
+r = await pedir({ accion: 'listar_usuarios' }, { token: otroUsuario });
+check('cambiar el usuario dentro del token -> 401', r.status === 401, `-> ${r.status}`);
+
+const sinFirma = `${b64({ alg: 'none', typ: 'JWT' })}.${p}.`;
+r = await pedir({ accion: 'listar_usuarios' }, { token: sinFirma });
+check('alg "none" sin firma -> 401', r.status === 401, `-> ${r.status}`);
+
+const datosAjenos = `${h}.${p}`;
+r = await pedir({ accion: 'listar_usuarios' }, { token: `${datosAjenos}.${firmar(datosAjenos, 'otro-secreto-cualquiera-de-32-caracteres')}` });
+check('firmado con otro secreto -> 401', r.status === 401, `-> ${r.status}`);
+
+const vencido = sesion.emitir('jefa', Date.now() - 9 * 3600 * 1000).token;
+r = await pedir({ accion: 'listar_usuarios' }, { token: vencido });
+check('token vencido -> 401', r.status === 401, `-> ${r.status}`);
+
+r = await pedir({ accion: 'listar_usuarios' }, { token: 'basura' });
+check('texto cualquiera -> 401', r.status === 401, `-> ${r.status}`);
+
+// Con sesión válida pero sin el rol.
+r = await pedir({ accion: 'login', email: 'auditor', clave: CLAVE_OK });
+const tokenAuditor = r.body.token;
+r = await pedir({ accion: 'crear_usuario', usuario: 'intruso', correo: 'i@x.test', rol: 'rrhh' }, { token: tokenAuditor });
+check('auditoría no crea usuarios -> 403', r.status === 403, `-> ${r.status}`);
+r = await pedir({ accion: 'cambiar_roles', usuario: 'auditor', rol: 'rrhh,auditoria' }, { token: tokenAuditor });
+check('ni se sube a sí mismo el rol -> 403', r.status === 403, `-> ${r.status}`);
+check('su rol sigue igual', dyn.__estado.usuarios['auditor'].rol.S === 'auditoria');
+
+// Quién hace el cambio sale del token, no del cuerpo.
+r = await pedir({ accion: 'eliminar_usuario', usuario: 'jefa', usuario_actual: 'otra' }, { token: tokenJefa });
+check('no se puede eliminar a sí misma aunque el cuerpo diga otra cosa', r.status === 400
+  && /propio/.test(r.body.descripcion), r.body.descripcion);
+check('sigue existiendo', !!dyn.__estado.usuarios['jefa']);
+
+// El rol se revisa en la tabla en cada petición, no en el token.
+dyn.__estado.usuarios['jefa'].rol = { S: 'auditoria' };
+r = await pedir({ accion: 'listar_usuarios' }, { token: tokenJefa });
+check('si le quitan rrhh, su token deja de servir para administrar -> 403', r.status === 403, `-> ${r.status}`);
+delete dyn.__estado.usuarios['jefa'];
+r = await pedir({ accion: 'listar_usuarios' }, { token: tokenJefa });
+check('si la eliminan, su token muere en la siguiente petición -> 401', r.status === 401, `-> ${r.status}`);
+
+// Con la temporal no hay sesión: solo sirve para cambiarla.
+reset();
+await pedir({ accion: 'crear_usuario', usuario: 'nueva', correo: 'nueva@x.test', rol: 'rrhh' });
+const temp = extraerTemporal(mail.__enviados[0]);
+r = await pedir({ accion: 'login', email: 'nueva', clave: temp });
+check('con la temporal no entrega token', r.body.codigo === 0 && !r.body.token, JSON.stringify(r.body).slice(0, 80));
+r = await pedir({ accion: 'cambiar_clave', email: 'nueva', clave_actual: temp, nueva_clave: CLAVE_OK });
+check('al elegir la propia sí', typeof r.body.token === 'string', JSON.stringify(r.body).slice(0, 80));
+r = await pedir({ accion: 'listar_usuarios' }, { token: r.body.token });
+check('y con ese token administra', r.status === 200, `-> ${r.status}`);
+
+// Sin secreto configurado, falla cerrado.
+delete process.env.SESION_SECRETO;
+r = await pedir({ accion: 'login', email: 'nueva', clave: CLAVE_OK });
+check('sin secreto el login avisa en vez de entregar algo inservible -> 503', r.status === 503, `-> ${r.status}`);
+r = await pedir({ accion: 'listar_usuarios' }, { token: tokenJefa });
+check('y nadie administra -> 503', r.status === 503, `-> ${r.status}`);
+process.env.SESION_SECRETO = 'corto';
+r = await pedir({ accion: 'listar_usuarios' }, { token: tokenJefa });
+check('un secreto corto cuenta como ausente -> 503', r.status === 503, `-> ${r.status}`);
+process.env.SESION_SECRETO = SECRETO;
+
+// Lo público sigue público.
+r = await pedir({ accion: 'politica' }, { token: null });
+check('la política de contraseñas no pide sesión', r.status === 200);
+r = await pedir({ accion: 'solicitar', email: 'nueva' }, { token: null });
+check('pedir un código de recuperación tampoco', r.status === 200);
 
 console.log(`\n${'─'.repeat(52)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);

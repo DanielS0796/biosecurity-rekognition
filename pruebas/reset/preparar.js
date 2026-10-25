@@ -14,3 +14,5 @@ for (const [origen, paquete] of paquetes) {
 }
 fs.copyFileSync(path.join(__dirname, 'dobles', 'instrument.js'), path.join(__dirname, 'instrument.js'));
 fs.copyFileSync(path.join(__dirname, '..', '..', 'lambda', 'reset.js'), path.join(__dirname, 'reset.actual.js'));
+// El Lambda hace require('./sesion.js'), así que va al lado de la copia.
+fs.copyFileSync(path.join(__dirname, '..', '..', 'lambda', 'sesion.js'), path.join(__dirname, 'sesion.js'));

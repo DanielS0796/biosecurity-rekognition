@@ -1,6 +1,15 @@
+const SECRETO = 'secreto-de-prueba-con-mas-de-32-caracteres';
+process.env.SESION_SECRETO = SECRETO;
 require('./preparar.js');
 const dyn = require('@aws-sdk/client-dynamodb');
 const { handler } = require('./auditoria.actual.js');
+const sesion = require('./sesion.js');
+
+// Quien consulta el reporte en las pruebas. El rol se lee de la tabla de
+// usuarios en cada petición, así que tiene que estar ahí.
+dyn.__estado.usuarios['auditor'] = { email: { S: 'auditor' }, rol: { S: 'auditoria' } };
+dyn.__estado.usuarios['rrhh'] = { email: { S: 'rrhh' }, rol: { S: 'rrhh' } };
+const TOKEN = sesion.emitir('auditor').token;
 
 let pasaron = 0, fallaron = 0;
 function check(nombre, cond, detalle = '') {
@@ -18,8 +27,9 @@ const acceso = (id, nombre, fechaHora, tipo) => ({
   metodo_validacion: { S: 'liveness' },
 });
 
-const pedir = async (q) => {
-  const r = await handler({ httpMethod: 'GET', queryStringParameters: q });
+const pedir = async (q, token = TOKEN) => {
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  const r = await handler({ httpMethod: 'GET', headers, queryStringParameters: q });
   return { status: r.statusCode, body: r.body, json: (() => { try { return JSON.parse(r.body); } catch { return null; } })() };
 };
 
@@ -264,6 +274,28 @@ check('el encabezado separa las dos fechas',
 check('y la fila trae los noventa minutos',
   /"2026-10-06";"08:00";"2026-10-06";"09:30";"90"/.test(csvNuevo),
   csvNuevo.split('\n')[1]);
+
+console.log('\n── Sesión: el reporte solo lo ve auditoría ──');
+reset();
+dyn.__estado.accesos = [acceso('100', 'Ana Gómez', '2026-10-06T19:00:00Z', 'ENTRADA')];
+let s1 = await pedir({ format: 'json' }, null);
+check('sin token -> 401', s1.status === 401, `-> ${s1.status}`);
+check('y no consulta los accesos', dyn.__estado.scans.length === 0, `scans: ${dyn.__estado.scans.length}`);
+s1 = await pedir({}, null);
+check('tampoco el CSV -> 401', s1.status === 401 && !String(s1.body).includes('Ana'), `-> ${s1.status}`);
+s1 = await pedir({ format: 'json' }, sesion.emitir('rrhh').token);
+check('con sesión de RR. HH. sin auditoría -> 403', s1.status === 403, `-> ${s1.status}`);
+s1 = await pedir({ format: 'json' }, sesion.emitir('auditor', Date.now() - 9 * 3600 * 1000).token);
+check('token vencido -> 401', s1.status === 401, `-> ${s1.status}`);
+const [h, p] = TOKEN.split('.');
+s1 = await pedir({ format: 'json' }, `${h}.${p}.firmafalsa`);
+check('firma alterada -> 401', s1.status === 401, `-> ${s1.status}`);
+s1 = await pedir({ format: 'json' }, sesion.emitir('fantasma').token);
+check('usuario que no existe -> 401', s1.status === 401, `-> ${s1.status}`);
+s1 = await pedir({ format: 'json' });
+check('con sesión de auditoría sí -> 200', s1.status === 200 && s1.json.items.length === 1, `-> ${s1.status}`);
+const pre = await handler({ httpMethod: 'OPTIONS', headers: {} });
+check('el preflight permite la cabecera Authorization', /Authorization/.test(pre.headers['Access-Control-Allow-Headers']));
 
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);

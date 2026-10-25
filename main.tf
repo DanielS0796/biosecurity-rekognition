@@ -153,6 +153,18 @@ locals {
     SENTRY_DSN = var.sentry_dsn
     TEAM_GROUP = var.team_group
   }
+
+  # Sesión firmada (lambda/sesion.js). Reset la emite al iniciar sesión y
+  # las cuatro Lambdas la verifican antes de cualquier acción
+  # administrativa. El rol de quien llama se lee de la tabla de usuarios
+  # en cada petición, por eso todas reciben la tabla y el nombre del
+  # usuario de emergencia, que no vive en ella.
+  sesion = {
+    SESION_SECRETO           = var.sesion_secreto
+    SESION_HORAS             = "8"
+    TABLA_USUARIOS           = aws_dynamodb_table.usuarios.name
+    ADMIN_EMERGENCIA_USUARIO = var.admin_emergencia_usuario
+  }
 }
 
 resource "aws_rekognition_collection" "coleccion" {
@@ -292,7 +304,7 @@ resource "aws_lambda_function" "registrar_empleado" {
   timeout          = 30
   memory_size      = 256
   environment {
-    variables = merge(local.observabilidad, {
+    variables = merge(local.observabilidad, local.sesion, {
       COLLECTION_ID   = "coleccion2anlusoft"
       TABLE_EMPLEADOS = aws_dynamodb_table.empleados.name
       MODULE_NAME     = "registrar-empleado"
@@ -322,7 +334,7 @@ resource "aws_lambda_function" "auditoria" {
   memory_size      = 512
 
   environment {
-    variables = merge(local.observabilidad, {
+    variables = merge(local.observabilidad, local.sesion, {
       MODULE_NAME  = "auditoria"
       ZONA_HORARIA = "America/Bogota"
     })
@@ -464,7 +476,7 @@ resource "aws_api_gateway_integration_response" "rrhh_options" {
   http_method = aws_api_gateway_method.rrhh_options.http_method
   status_code = "200"
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -650,7 +662,7 @@ resource "aws_api_gateway_integration_response" "auditoria_options" {
   http_method = aws_api_gateway_method.auditoria_options.http_method
   status_code = "200"
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
@@ -890,7 +902,7 @@ resource "aws_lambda_function" "reset" {
   memory_size      = 256
 
   environment {
-    variables = merge(local.observabilidad, {
+    variables = merge(local.observabilidad, local.sesion, {
       TABLA_USUARIOS      = aws_dynamodb_table.usuarios.name
       TABLA_CODIGOS       = aws_dynamodb_table.reset_codes.name
       MODULE_NAME         = "reset"
@@ -980,7 +992,7 @@ resource "aws_api_gateway_integration_response" "reset_options" {
   http_method = aws_api_gateway_method.reset_options.http_method
   status_code = "200"
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Api-Key,Authorization'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }

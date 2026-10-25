@@ -8,6 +8,7 @@ const {
 } = require("@aws-sdk/client-dynamodb");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const sesion = require("./sesion.js");
 
 const dynamo = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
 
@@ -37,7 +38,7 @@ const ADMIN_EMERGENCIA_CORREO = process.env.ADMIN_EMERGENCIA_CORREO || "";
 
 const CORS = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key",
+    "Access-Control-Allow-Headers": "Content-Type,X-Api-Key,Authorization",
     "Access-Control-Allow-Methods": "POST,OPTIONS",
 };
 
@@ -331,6 +332,17 @@ async function login(body) {
         }
     }
 
+    // Con la temporal no se entrega sesión: lo único que se puede hacer con
+    // ella es cambiarla, y eso pide la contraseña actual, no un token.
+    let s = null;
+    if (!usuario.debe_cambiar_clave) {
+        s = sesion.emitir(email);
+        if (!s) {
+            log("ERROR", "No se pudo emitir la sesión: SESION_SECRETO sin configurar", { email });
+            return error(503, "El servicio no está configurado. Avisa al administrador del sistema.");
+        }
+    }
+
     log("INFO", "Acceso concedido", { email, rol: usuario.rol });
 
     return responder(200, {
@@ -338,6 +350,7 @@ async function login(body) {
         descripcion: "Login exitoso",
         rol: usuario.rol,
         debe_cambiar_clave: usuario.debe_cambiar_clave,
+        ...(s ? { token: s.token, expira: s.expira } : {}),
     });
 }
 
@@ -379,15 +392,20 @@ async function cambiarClavePropia(body) {
     await guardarClave(email, nueva_clave, { debeCambiar: false });
     log("INFO", "Contraseña cambiada por el usuario", { email });
 
-    // Se devuelve el rol para que el front entre sin pedir login otra vez.
+    // Se devuelven el rol y la sesión para que el front entre sin pedir
+    // login otra vez. Si no hay secreto la contraseña igual queda cambiada;
+    // la persona tendrá que iniciar sesión cuando se corrija la configuración.
+    const s = sesion.emitir(email);
+    if (!s) log("ERROR", "Contraseña cambiada pero sin sesión: SESION_SECRETO sin configurar", { email });
     return responder(200, {
         codigo: 0,
         descripcion: "Contraseña actualizada",
         rol: usuario.rol,
+        ...(s ? { token: s.token, expira: s.expira } : {}),
     });
 }
 
-async function crearUsuario(body) {
+async function crearUsuario(body, quien) {
     const { usuario, correo, rol } = body;
 
     if (!usuario || !correo) {
@@ -447,7 +465,7 @@ async function crearUsuario(body) {
         return error(502, "No se pudo enviar el correo. El usuario no fue creado; revisa la dirección e intenta de nuevo.");
     }
 
-    log("INFO", "Usuario creado", { usuario, rol: roles, horas: HORAS_CLAVE_TEMPORAL });
+    log("INFO", "Usuario creado", { usuario, rol: roles, horas: HORAS_CLAVE_TEMPORAL, por: quien.usuario });
 
     return responder(200, {
         codigo: 0,
@@ -467,8 +485,12 @@ async function crearUsuario(body) {
  * antes se quedaron con lo que tuvieran guardado. Esto es para
  * corregirlos sin recrearlos.
  */
-async function cambiarRoles(body) {
-    const { usuario, rol, usuario_actual } = body;
+async function cambiarRoles(body, quien) {
+    const { usuario, rol } = body;
+    // Quién hace el cambio sale de la sesión. Antes venía en el cuerpo, y
+    // bastaba con escribir otro nombre para saltarse la regla de no
+    // quitarse a uno mismo el permiso de registro.
+    const usuario_actual = quien.usuario;
     if (!usuario) return error(400, "Falta el usuario");
 
     const pedidos = Array.isArray(rol) ? rol : String(rol || "").split(",");
@@ -523,7 +545,7 @@ async function cambiarRoles(body) {
         },
     }));
 
-    log("INFO", "Roles cambiados", { usuario, antes: registro.rol, ahora: validos });
+    log("INFO", "Roles cambiados", { usuario, antes: registro.rol, ahora: validos, por: usuario_actual });
     return responder(200, {
         codigo: 0,
         descripcion: `Permisos de ${usuario} actualizados`,
@@ -559,8 +581,9 @@ function textoClaveTemporal(usuario, temporal) {
     ].join("\n");
 }
 
-async function eliminarUsuario(body) {
-    const { usuario, usuario_actual } = body;
+async function eliminarUsuario(body, quien) {
+    const { usuario } = body;
+    const usuario_actual = quien.usuario;
     if (!usuario) return error(400, "Falta el usuario a eliminar");
     if (usuario === usuario_actual) return error(400, "No puedes eliminar tu propio usuario");
 
@@ -577,7 +600,7 @@ async function eliminarUsuario(body) {
         Key: { email: { S: usuario } },
     }));
 
-    log("INFO", "Usuario eliminado", { usuario });
+    log("INFO", "Usuario eliminado", { usuario, por: usuario_actual });
     return responder(200, { codigo: 0, descripcion: `Usuario ${usuario} eliminado` });
 }
 
@@ -753,6 +776,16 @@ function politica() {
  * Router
  * ════════════════════════════════════════════════════════════ */
 
+// Acciones que administran usuarios y el rol que exigen. El resto
+// (login, recuperación de contraseña, política) son públicas por
+// naturaleza: se usan justamente cuando todavía no hay sesión.
+const PROTEGIDAS = {
+    crear_usuario: "rrhh",
+    cambiar_roles: "rrhh",
+    eliminar_usuario: "rrhh",
+    listar_usuarios: "rrhh",
+};
+
 const ACCIONES = {
     login,
     crear_usuario: crearUsuario,
@@ -778,6 +811,17 @@ exports.handler = Sentry.wrapHandler(async (event) => {
 
         const manejar = ACCIONES[accion];
         if (!manejar) return error(400, "Acción no reconocida");
+
+        if (PROTEGIDAS[accion]) {
+            // El rol se revisa contra la tabla con la misma función del login,
+            // que también reconoce al usuario de emergencia.
+            const quien = await sesion.exigir(event, PROTEGIDAS[accion], {
+                cargarRoles: async (u) => (await obtenerUsuario(u))?.rol || null,
+                log,
+            });
+            if (!quien.ok) return error(quien.status, quien.descripcion);
+            return await manejar(body, quien);
+        }
 
         return await manejar(body);
 

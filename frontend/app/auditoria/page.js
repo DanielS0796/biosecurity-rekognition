@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { API_AUDITORIA, API_RESET, API_KEY_AUD } from '../config'
@@ -54,6 +54,28 @@ export default function Auditoria() {
   // Quien entra con una contraseña temporal no pasa al sistema: primero
   // la cambia. Se guarda la temporal para poder probar el cambio.
   const [cambioPendiente, setCambioPendiente] = useState(null)
+  // Token de la sesión que entrega el servidor al iniciar sesión. Vive solo
+  // en memoria: recargar la página cierra la sesión, como ya pasaba, y no
+  // queda nada guardado en el navegador que otro script pueda leer. Es un
+  // ref y no un estado porque las llamadas que siguen al login se hacen
+  // en el mismo ciclo, antes de que un estado alcance a actualizarse.
+  const tokenRef = useRef(null)
+
+  // Cabeceras de toda llamada que exige sesión.
+  function conSesion(extra = {}) {
+    return tokenRef.current ? { ...extra, Authorization: `Bearer ${tokenRef.current}` } : extra
+  }
+
+  // El servidor responde 401 cuando el token venció, lo alteraron o el
+  // usuario ya no existe. Se vuelve al login en vez de dejar la pantalla
+  // fallando en cada clic.
+  function revisarSesion(r) {
+    if (r.status !== 401) return
+    tokenRef.current = null
+    setLogueado(false)
+    setLoginPass('')
+    setLoginError('Su sesión venció o ya no es válida. Inicie sesión de nuevo.')
+  }
 
   const [datos, setDatos] = useState([])
   const [busqueda, setBusqueda] = useState('')
@@ -106,6 +128,7 @@ export default function Auditoria() {
       if (body.codigo === 0 && body.debe_cambiar_clave) {
         setCambioPendiente({ usuario: loginUser.trim(), clave: loginPass.trim() })
       } else if (body.codigo === 0 && body.rol.includes('auditoria')) {
+        tokenRef.current = body.token || null
         setLogueado(true)
         setUsuarioActual(loginUser)
         cargarAuditoria()
@@ -119,6 +142,7 @@ export default function Auditoria() {
   }
 
   function logout() {
+    tokenRef.current = null
     setLogueado(false)
     setLoginPass('')
     setLoginUser('')
@@ -137,7 +161,8 @@ export default function Auditoria() {
       if (fechaDesde) params.set('desde', fechaDesde)
       if (fechaHasta) params.set('hasta', fechaHasta)
 
-      const r = await fetch(`${API_AUDITORIA}?${params}`, { headers: { 'x-api-key': API_KEY_AUD } })
+      const r = await fetch(`${API_AUDITORIA}?${params}`, { headers: conSesion({ 'x-api-key': API_KEY_AUD }) })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       setDatos(body.items || [])
@@ -168,8 +193,9 @@ export default function Auditoria() {
       // desde que el sistema existe, que es justo lo que se necesita
       // cuando alguien pregunta por un caso concreto.
       const r = await fetch(`${API_AUDITORIA}?format=json`, {
-        headers: { 'x-api-key': API_KEY_AUD },
+        headers: conSesion({ 'x-api-key': API_KEY_AUD }),
       })
+      revisarSesion(r)
       const data = await r.json()
       const body = typeof data.body === 'string' ? JSON.parse(data.body) : data
       const historico = body.items || []
@@ -321,14 +347,18 @@ export default function Auditoria() {
     <CambioClaveObligatorio
       usuario={cambioPendiente.usuario}
       claveActual={cambioPendiente.clave}
-      onListo={(roles) => {
+      onListo={(roles, token) => {
         const usuario = cambioPendiente.usuario
         setCambioPendiente(null)
         setLoginPass('')
-        if (roles.includes('auditoria')) {
+        if (roles.includes('auditoria') && token) {
+          tokenRef.current = token
           setLogueado(true)
           setUsuarioActual(usuario)
           cargarAuditoria()
+        } else if (roles.includes('auditoria')) {
+          // La contraseña quedó cambiada pero el servidor no entregó sesión.
+          setLoginError('Contraseña actualizada. Inicie sesión con la nueva.')
         } else {
           alert('Contraseña actualizada. Su usuario no tiene permiso para este módulo.')
         }

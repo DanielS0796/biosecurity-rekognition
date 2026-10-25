@@ -10,6 +10,11 @@ admin_emergencia_usuario = "dfguatibonza"
 admin_emergencia_hash    = "scrypt$16384$8$1$...$..."
 admin_emergencia_correo  = "danielsuarez0796@gmail.com"
 
+# Secreto para firmar las sesiones de RR. HH. y auditoría. Se genera una
+# vez con `openssl rand -hex 32` y no se comparte ni se versiona. Cambiarlo
+# cierra todas las sesiones abiertas.
+sesion_secreto = "pegar-aqui-el-resultado-de-openssl-rand-hex-32"
+
 # Observabilidad. Si se deja vacío, los Lambdas corren sin reportar
 # errores a Sentry (no fallan, simplemente no reportan nada).
 # El valor está en Sentry: Settings > Projects > Client Keys (DSN).

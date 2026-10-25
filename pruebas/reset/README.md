@@ -36,3 +36,14 @@ primer ingreso.
 **El login revelaba qué usuarios existen**, respondiendo distinto ante usuario
 inexistente y contraseña incorrecta. Ahora el mensaje es el mismo, y pedir un
 código de recuperación responde igual exista o no la cuenta.
+
+**El servidor no sabía quién llamaba (R09).** Crear usuarios, cambiar roles,
+eliminarlos y listarlos respondía a cualquiera que conociera la URL: la
+interfaz escondía los botones, pero la Lambda no pedía sesión. Ahora el login
+entrega un token firmado (`lambda/sesion.js`) y esas cuatro acciones lo
+exigen. La sección 23 fija el comportamiento: sin token, 401; con token
+alterado, firmado con otro secreto, con `alg: none` o vencido, 401; con sesión
+pero sin el rol, 403; si a la persona le quitan el rol o la eliminan, su token
+deja de servir en la siguiente petición. Quién hace el cambio sale del token,
+no del cuerpo, que es lo que permitía saltarse "no te puedes quitar tu propio
+permiso" escribiendo otro nombre.
