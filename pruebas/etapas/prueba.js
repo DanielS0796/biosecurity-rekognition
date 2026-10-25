@@ -126,6 +126,16 @@ if (ajustes && /throttling_rate_limit/.test(ajustes.cuerpo) && /throttling_burst
     mal("la etapa de liveness no tiene throttling: lo que pase del tope de Lambda saldría como 500");
 }
 
+// La ráfaga de la etapa queda por debajo de la concurrencia reservada de
+// la función: si no, el pico llega a la Lambda, la satura y sale como 500
+// en lugar de 429 (lo que mostró la prueba de carga del 25 de octubre).
+const lambdaLiveness = bloques("aws_lambda_function").find(b => /handler\s*=\s*"liveness\./.test(b.cuerpo))?.cuerpo || "";
+const reserva = Number((/reserved_concurrent_executions\s*=\s*(\d+)/.exec(lambdaLiveness) || [])[1]);
+const rafaga = Number((/throttling_burst_limit\s*=\s*(\d+)/.exec(ajustes?.cuerpo || "") || [])[1]);
+if (!reserva) mal("la función de liveness no tiene concurrencia reservada");
+else if (!(rafaga > 0 && rafaga < reserva)) mal(`la ráfaga de la etapa (${rafaga}) no queda por debajo de la reserva de la función (${reserva})`);
+else ok(`ráfaga de la etapa (${rafaga}) por debajo de la reserva de la función (${reserva})`);
+
 // Las respuestas propias de API Gateway llevan CORS y entran en el despliegue.
 // Se mira solo dentro de triggers: estar en depends_on ordena la creación,
 // pero no hace que un cambio en la respuesta vuelva a publicar la etapa.

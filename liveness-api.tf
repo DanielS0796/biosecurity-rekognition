@@ -32,6 +32,18 @@ resource "aws_lambda_function" "liveness" {
   timeout          = 60
   memory_size      = 512
 
+  # Concurrencia reservada: 30 ejecuciones simultáneas que son solo de
+  # esta función. Sin reserva, las cinco Lambdas comparten el cupo de la
+  # cuenta, y un pico en RR. HH. o auditoría (o alguien golpeándolas)
+  # podía dejar sin capacidad la portería. La reserva también es un
+  # techo: liveness no pasa de 30 a la vez, lo que acota cuántas
+  # sesiones de Face Liveness se pueden abrir en paralelo.
+  #
+  # Solo fue posible después del 25 de octubre de 2026, cuando AWS subió
+  # la cuota de la cuenta de 10 a 1000: con 10 no se puede reservar nada,
+  # porque AWS exige dejar al menos 100 sin reservar.
+  reserved_concurrent_executions = 30
+
   environment {
     # Merge con la sesión: el registro facial exige la de RR. HH.
     variables = merge(local.sesion, {
@@ -194,25 +206,24 @@ resource "aws_api_gateway_deployment" "liveness_deployment" {
 # invocar la función ni a abrir una sesión de Rekognition.
 #
 # El número clave es la ráfaga, no la tasa: es cuántas solicitudes admite
-# API Gateway de golpe antes de empezar a cortar. Una prueba del 25 de
-# octubre con ráfagas de 10 dejaba pasar el pico inicial justo hasta el
-# tope de 10 Lambdas de la cuenta, y lo que lo rozaba volvía a salir como
-# 500. Con la ráfaga en 5 el pico instantáneo se queda en la mitad del
-# tope: Lambda nunca se satura por una avalancha y lo que sobra recibe
-# 429 limpio, sin 500.
+# API Gateway de golpe antes de empezar a cortar. Tiene que quedar por
+# debajo de la concurrencia reservada de la función (30): así una
+# avalancha nunca llega a saturar la Lambda y lo que sobra recibe 429
+# limpio, sin 500. Con la cuota anterior de 10 Lambdas para toda la
+# cuenta, la ráfaga tenía que ser de 5; desde que AWS la subió a 1000 y
+# liveness tiene su reserva, sube a 20.
 #
-# 5 por segundo es más de diez veces lo que piden dos puertas (menos de
-# una por segundo), así que el uso normal ni lo roza. Cuando se amplíe la
-# cuota de concurrencia (punto 4 de las mejoras), estos dos números suben
-# con ella.
+# 10 por segundo sigue siendo más de veinte veces lo que piden dos
+# puertas (menos de una por segundo), y el WAF limita además a 300
+# sesiones cada cinco minutos por dirección IP.
 resource "aws_api_gateway_method_settings" "liveness_limite" {
   rest_api_id = aws_api_gateway_rest_api.api_liveness.id
   stage_name  = aws_api_gateway_deployment.liveness_deployment.stage_name
   method_path = "*/*"
 
   settings {
-    throttling_rate_limit  = 5
-    throttling_burst_limit = 5
+    throttling_rate_limit  = 10
+    throttling_burst_limit = 20
   }
 
   # Los ajustes viven en la etapa, y la etapa se borra y se vuelve a crear
