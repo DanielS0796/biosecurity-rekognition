@@ -191,19 +191,28 @@ resource "aws_api_gateway_deployment" "liveness_deployment" {
 # disponibilidad y que la aplicación no sabe distinguir de una falla real.
 #
 # Con este límite API Gateway corta antes, con un 429 que no llega a
-# invocar la función ni a abrir una sesión de Rekognition. 8 por segundo
-# con ráfagas de 10 queda justo por debajo del tope de Lambda y muy por
-# encima de lo que piden dos puertas, que es menos de una por segundo.
-# Si se amplía la cuota de concurrencia (punto 4 de las mejoras), estos
-# dos números suben con ella.
+# invocar la función ni a abrir una sesión de Rekognition.
+#
+# El número clave es la ráfaga, no la tasa: es cuántas solicitudes admite
+# API Gateway de golpe antes de empezar a cortar. Una prueba del 25 de
+# octubre con ráfagas de 10 dejaba pasar el pico inicial justo hasta el
+# tope de 10 Lambdas de la cuenta, y lo que lo rozaba volvía a salir como
+# 500. Con la ráfaga en 5 el pico instantáneo se queda en la mitad del
+# tope: Lambda nunca se satura por una avalancha y lo que sobra recibe
+# 429 limpio, sin 500.
+#
+# 5 por segundo es más de diez veces lo que piden dos puertas (menos de
+# una por segundo), así que el uso normal ni lo roza. Cuando se amplíe la
+# cuota de concurrencia (punto 4 de las mejoras), estos dos números suben
+# con ella.
 resource "aws_api_gateway_method_settings" "liveness_limite" {
   rest_api_id = aws_api_gateway_rest_api.api_liveness.id
   stage_name  = aws_api_gateway_deployment.liveness_deployment.stage_name
   method_path = "*/*"
 
   settings {
-    throttling_rate_limit  = 8
-    throttling_burst_limit = 10
+    throttling_rate_limit  = 5
+    throttling_burst_limit = 5
   }
 
   # Los ajustes viven en la etapa, y la etapa se borra y se vuelve a crear
