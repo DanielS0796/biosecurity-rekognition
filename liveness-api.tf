@@ -167,6 +167,8 @@ resource "aws_api_gateway_deployment" "liveness_deployment" {
       aws_api_gateway_method.liveness_options,
       aws_api_gateway_integration.liveness_options,
       aws_api_gateway_integration_response.liveness_options,
+      aws_api_gateway_gateway_response.liveness_limitado,
+      aws_api_gateway_gateway_response.liveness_waf,
     ]))
   }
 
@@ -174,7 +176,72 @@ resource "aws_api_gateway_deployment" "liveness_deployment" {
     aws_api_gateway_integration.liveness_post,
     aws_api_gateway_integration.liveness_options,
     aws_api_gateway_integration_response.liveness_options,
+    aws_api_gateway_gateway_response.liveness_limitado,
+    aws_api_gateway_gateway_response.liveness_waf,
   ]
+}
+
+# ─────────────────────────────────────────
+# Límite de solicitudes en la etapa
+# ─────────────────────────────────────────
+# La cuenta tiene un tope de 10 Lambdas ejecutándose a la vez, compartido
+# por todas las funciones. En la prueba de carga del 13 de octubre lo que
+# pasaba de ese tope llegaba a Lambda, Lambda lo rechazaba y la API
+# devolvía 500: un error del servidor, que cuenta contra la
+# disponibilidad y que la aplicación no sabe distinguir de una falla real.
+#
+# Con este límite API Gateway corta antes, con un 429 que no llega a
+# invocar la función ni a abrir una sesión de Rekognition. 8 por segundo
+# con ráfagas de 10 queda justo por debajo del tope de Lambda y muy por
+# encima de lo que piden dos puertas, que es menos de una por segundo.
+# Si se amplía la cuota de concurrencia (punto 4 de las mejoras), estos
+# dos números suben con ella.
+resource "aws_api_gateway_method_settings" "liveness_limite" {
+  rest_api_id = aws_api_gateway_rest_api.api_liveness.id
+  stage_name  = aws_api_gateway_deployment.liveness_deployment.stage_name
+  method_path = "*/*"
+
+  settings {
+    throttling_rate_limit  = 8
+    throttling_burst_limit = 10
+  }
+
+  # Los ajustes viven en la etapa, y la etapa se borra y se vuelve a crear
+  # cada vez que se reemplaza el despliegue. Mismo problema y misma
+  # solución que las asociaciones del WAF (waf.tf).
+  lifecycle {
+    replace_triggered_by = [aws_api_gateway_deployment.liveness_deployment]
+  }
+}
+
+# Las respuestas que arma API Gateway por su cuenta, sin pasar por la
+# Lambda, no llevan cabeceras CORS. El navegador las descarta y la
+# aplicación ve un "error de conexión" en vez del 429 que sí sabe
+# explicar. Estas dos les agregan la cabecera.
+resource "aws_api_gateway_gateway_response" "liveness_limitado" {
+  rest_api_id   = aws_api_gateway_rest_api.api_liveness.id
+  response_type = "THROTTLED"
+  status_code   = "429"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin" = "'*'"
+  }
+  response_templates = {
+    "application/json" = jsonencode({ codigo = 1, descripcion = "Hay demasiadas solicitudes en este momento. Espere unos segundos e intente de nuevo." })
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "liveness_waf" {
+  rest_api_id   = aws_api_gateway_rest_api.api_liveness.id
+  response_type = "WAF_FILTERED"
+  status_code   = "403"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin" = "'*'"
+  }
+  response_templates = {
+    "application/json" = jsonencode({ codigo = 1, descripcion = "La solicitud fue bloqueada por el firewall." })
+  }
 }
 
 resource "aws_lambda_permission" "apigw_liveness" {

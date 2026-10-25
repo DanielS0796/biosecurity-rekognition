@@ -58,9 +58,9 @@ variable "team_group" {
 # ── WAF ───────────────────────────────────────────────────────────────
 
 variable "proteger_liveness" {
-  description = "Asocia el WAF también al API de liveness, que es el que sirve el acceso diario. Se activa cuando los otros tres lleven unos días sin bloqueos falsos."
+  description = "Asocia el WAF también al API de liveness, que es el que sirve el acceso diario. Activo desde el 25 de octubre de 2026; false lo quita solo de esa API si alguna regla bloqueara accesos legítimos."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "sesion_secreto" {

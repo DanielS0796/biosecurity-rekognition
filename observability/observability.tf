@@ -408,3 +408,74 @@ resource "aws_cloudwatch_metric_alarm" "liveness_api_5xx" {
     }
   }
 }
+
+# ─────────────────────────────────────────
+# Presupuesto
+# ─────────────────────────────────────────
+# Cada escaneo de Face Liveness se cobra, y la API que los abre es
+# pública porque en la portería nadie inicia sesión. El WAF limita lo
+# que puede pedir una sola dirección IP, pero no a alguien con muchas.
+# Lo que queda es enterarse a tiempo: este presupuesto avisa por correo
+# cuando el gasto real del mes pasa del 80 % y cuando la proyección del
+# mes completo pasa del 100 %.
+#
+# El valor por defecto sale de lo que cuesta hoy el sistema en reposo:
+# unos 9 USD del WAF, 1 USD de la llave KMS y unos pocos dólares de
+# Rekognition y Amplify. Cubre la cuenta entera, no solo los recursos del
+# proyecto, así que también avisa si alguien deja encendido algo ajeno.
+# Los dos primeros presupuestos de una cuenta no cuestan nada.
+variable "presupuesto_mensual_usd" {
+  description = "Tope mensual de gasto de la cuenta, en dólares, para la alarma de presupuesto"
+  type        = string
+  default     = "25"
+}
+
+resource "aws_budgets_budget" "mensual" {
+  name         = "biosecurity-mensual"
+  budget_type  = "COST"
+  limit_amount = var.presupuesto_mensual_usd
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = [var.alert_email]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "FORECASTED"
+    subscriber_email_addresses = [var.alert_email]
+  }
+}
+
+# ─────────────────────────────────────────
+# Alguien está abriendo sesiones de liveness en bucle
+# ─────────────────────────────────────────
+# El presupuesto avisa cuando ya se gastó; esta alarma avisa en el
+# momento, en cuanto el WAF bloquea por la regla de sesiones de liveness.
+# En uso normal nunca dispara: dos puertas no llegan ni cerca del límite.
+resource "aws_cloudwatch_metric_alarm" "liveness_waf_limite" {
+  alarm_name          = "biosecurity-liveness-limite-waf"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 0
+  alarm_description   = "El WAF bloqueó solicitudes por exceder el límite de sesiones de liveness"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  treat_missing_data  = "notBreaching"
+
+  metric_name = "BlockedRequests"
+  namespace   = "AWS/WAFV2"
+  period      = 300
+  statistic   = "Sum"
+  dimensions = {
+    WebACL = "biosecurity-apis"
+    Rule   = "limite-sesiones-liveness"
+    Region = "us-east-1"
+  }
+}

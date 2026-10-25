@@ -210,10 +210,15 @@ export default function LivenessScan({
             autorizacion, sin_destellos: sinDestellos,
           }),
         })
-        const data = await r.json()
+        // Un 429 lo puede armar el WAF o API Gateway, no la Lambda. Los dos
+        // mandan un JSON con descripción, pero si alguna vez llegara sin
+        // cuerpo, que el error diga qué pasó y no "Unexpected end of JSON".
+        const data = await r.json().catch(() => ({}))
 
         if (!r.ok || !data.session_id) {
-          setError(data.descripcion || 'No se pudo iniciar el escaneo')
+          setError(data.descripcion || (r.status === 429
+            ? 'Hay demasiadas solicitudes en este momento. Espere unos segundos e intente de nuevo.'
+            : 'No se pudo iniciar el escaneo'))
           setCargando(false)
           return
         }
@@ -241,12 +246,14 @@ export default function LivenessScan({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId }),
       })
-      const data = await r.json()
+      const data = await r.json().catch(() => ({}))
 
       if (r.ok && data.codigo === 0) {
         onExito?.(data)
       } else {
-        onFallo?.(data.descripcion || 'La verificación no fue exitosa')
+        onFallo?.(data.descripcion || (r.status === 429
+          ? 'Hay demasiadas solicitudes en este momento. Espere unos segundos e intente de nuevo.'
+          : 'La verificación no fue exitosa'))
       }
     } catch (err) {
       onFallo?.('No se pudo obtener el resultado: ' + err.message)

@@ -1,17 +1,9 @@
 # ─────────────────────────────────────────
-# WAF delante de los APIs — NO APLICADO
+# WAF delante de los APIs
 # ─────────────────────────────────────────
-# Decisión del 8 de octubre de 2026: queda escrito pero sin aplicar,
-# para no encimarlo con la migración de los APIs el mismo día.
-#
-# Mientras no se aplique no cuesta nada y no filtra nada. Se activa con
-# ./desplegar-waf.sh, que es el único camino pensado para esto.
-#
-# Ojo con una vía involuntaria: los scripts del proyecto aplican con
-# -target y por eso no lo tocan, pero un `terraform apply` sin -target
-# sí crearía el web ACL y lo asociaría a los tres APIs de gestión,
-# porque los recursos están declarados acá. Si corres un apply pelado,
-# revisa el plan antes de aceptarlo.
+# Escrito el 8 de octubre de 2026 y aplicado el 13 sobre los tres APIs de
+# gestión. El 25 de octubre se extendió al API de liveness, con una regla
+# propia para la creación de sesiones, que es la llamada que cuesta.
 #
 # Hasta ahora la única puerta de los APIs era la API key, y una llave que
 # viaja en el JavaScript del navegador la puede leer cualquiera que abra
@@ -21,8 +13,8 @@
 #
 # Un solo web ACL para los cuatro APIs. Se puede asociar a varias etapas
 # a la vez y así se paga una sola vez: el costo es 5 USD al mes por el
-# ACL, 1 USD por regla y 0,60 USD por millón de peticiones. Con las tres
-# reglas de acá son 8 USD al mes, que es la cifra que va al presupuesto.
+# ACL, 1 USD por regla y 0,60 USD por millón de peticiones. Con las cuatro
+# reglas de acá son 9 USD al mes, que es la cifra que va al presupuesto.
 #
 # La acción por defecto es permitir. Un WAF que empieza bloqueando todo
 # deja la portería cerrada el día que una regla nueva se equivoca.
@@ -40,6 +32,17 @@ resource "aws_wafv2_web_acl" "apis" {
 
   default_action {
     allow {}
+  }
+
+  # Lo que recibe quien supera un límite. Va con 429 y no con el 403 que
+  # WAF pone por defecto, para que la aplicación sepa que es "espere un
+  # momento" y no "no tiene permiso". La cabecera CORS hace falta porque
+  # esta respuesta la arma WAF y no la Lambda: sin ella, el navegador la
+  # descarta y la pantalla muestra un error de conexión que no explica nada.
+  custom_response_body {
+    key          = "demasiadas"
+    content_type = "APPLICATION_JSON"
+    content      = jsonencode({ codigo = 1, descripcion = "Hay demasiadas solicitudes desde esta red. Espere un momento e intente de nuevo." })
   }
 
   # ── Reglas comunes de AWS ──────────────────────────────────────────
@@ -115,7 +118,16 @@ resource "aws_wafv2_web_acl" "apis" {
     priority = 3
 
     action {
-      block {}
+      block {
+        custom_response {
+          response_code            = 429
+          custom_response_body_key = "demasiadas"
+          response_header {
+            name  = "Access-Control-Allow-Origin"
+            value = "*"
+          }
+        }
+      }
     }
 
     statement {
@@ -128,6 +140,68 @@ resource "aws_wafv2_web_acl" "apis" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "limite-por-ip"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # ── Límite propio para abrir sesiones de liveness ──────────────────
+  # Cada llamada a /liveness-init abre una sesión de Face Liveness en
+  # Rekognition, y eso es lo que cobra AWS. Es una API pública por
+  # necesidad, porque en la portería nadie inicia sesión, así que el
+  # límite general de 2000 dejaría a un solo script abrir cientos de
+  # sesiones por minuto y convertir el costo en el ataque.
+  #
+  # 300 cada cinco minutos por IP es cinco veces lo que pueden pedir dos
+  # puertas a pleno ritmo (un escaneo cada 10 segundos por puerta, unos
+  # 60 en cinco minutos), contando con que el campus entero sale por una
+  # sola dirección. Más arriba solo llega un script.
+  #
+  # No frena a un atacante con muchas direcciones IP. Para eso está la
+  # alarma de presupuesto (observability/), que avisa por correo cuando
+  # el gasto del mes se sale de lo normal.
+  rule {
+    name     = "limite-sesiones-liveness"
+    priority = 4
+
+    action {
+      block {
+        custom_response {
+          response_code            = 429
+          custom_response_body_key = "demasiadas"
+          response_header {
+            name  = "Access-Control-Allow-Origin"
+            value = "*"
+          }
+        }
+      }
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 300
+        aggregate_key_type = "IP"
+
+        scope_down_statement {
+          byte_match_statement {
+            search_string         = "/liveness-init"
+            positional_constraint = "ENDS_WITH"
+
+            field_to_match {
+              uri_path {}
+            }
+
+            text_transformation {
+              priority = 0
+              type     = "LOWERCASE"
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "limite-sesiones-liveness"
       sampled_requests_enabled   = true
     }
   }
@@ -267,12 +341,12 @@ resource "aws_wafv2_web_acl_association" "reset" {
   }
 }
 
-# Liveness es el único de los cuatro que ya sirve producción: es la
-# puerta por donde entra la gente todos los días. Se protege aparte,
-# cuando los otros tres lleven unos días con el WAF encima sin bloquear
-# nada legítimo.
+# Liveness es la puerta por donde entra la gente todos los días, así que
+# se protegió de último: los otros tres llevaban desde el 13 de octubre
+# con el WAF encima. Si una regla llegara a bloquear accesos legítimos,
+# se quita solo esta asociación sin tocar lo demás:
 #
-#   terraform apply -var proteger_liveness=true
+#   terraform apply -var proteger_liveness=false
 resource "aws_wafv2_web_acl_association" "liveness" {
   count = var.proteger_liveness ? 1 : 0
 
