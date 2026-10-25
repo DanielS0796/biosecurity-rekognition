@@ -188,6 +188,15 @@ resource "aws_dynamodb_table" "empleados" {
     name = "identificacion"
     type = "S"
   }
+  # Respaldo continuo: permite restaurar la tabla a cualquier segundo de
+  # los últimos 35 días. prevent_destroy cuida que Terraform no la borre;
+  # esto cubre lo demás (un borrado desde la consola, un script con un
+  # error, una Lambda que sobrescribe registros). Cuesta centavos al mes
+  # con el volumen del prototipo.
+  point_in_time_recovery {
+    enabled = true
+  }
+
   tags = { Project = "anlusoft-rekognition" }
   # Un plan que quiera recrear esto borraría datos irrecuperables. Así
   # Terraform falla en vez de destruirlo: el error se revisa a mano.
@@ -204,6 +213,15 @@ resource "aws_dynamodb_table" "retirados" {
     name = "identificacion"
     type = "S"
   }
+  # Respaldo continuo: permite restaurar la tabla a cualquier segundo de
+  # los últimos 35 días. prevent_destroy cuida que Terraform no la borre;
+  # esto cubre lo demás (un borrado desde la consola, un script con un
+  # error, una Lambda que sobrescribe registros). Cuesta centavos al mes
+  # con el volumen del prototipo.
+  point_in_time_recovery {
+    enabled = true
+  }
+
   tags = { Project = "anlusoft-rekognition" }
   # Un plan que quiera recrear esto borraría datos irrecuperables. Así
   # Terraform falla en vez de destruirlo: el error se revisa a mano.
@@ -242,6 +260,15 @@ resource "aws_dynamodb_table" "accesos" {
     hash_key        = "identificacion"
     range_key       = "fecha_hora"
     projection_type = "ALL"
+  }
+
+  # Respaldo continuo: permite restaurar la tabla a cualquier segundo de
+  # los últimos 35 días. prevent_destroy cuida que Terraform no la borre;
+  # esto cubre lo demás (un borrado desde la consola, un script con un
+  # error, una Lambda que sobrescribe registros). Cuesta centavos al mes
+  # con el volumen del prototipo.
+  point_in_time_recovery {
+    enabled = true
   }
 
   tags = { Project = "anlusoft-rekognition" }
@@ -836,6 +863,15 @@ resource "aws_dynamodb_table" "usuarios" {
     name = "email"
     type = "S"
   }
+  # Respaldo continuo: permite restaurar la tabla a cualquier segundo de
+  # los últimos 35 días. prevent_destroy cuida que Terraform no la borre;
+  # esto cubre lo demás (un borrado desde la consola, un script con un
+  # error, una Lambda que sobrescribe registros). Cuesta centavos al mes
+  # con el volumen del prototipo.
+  point_in_time_recovery {
+    enabled = true
+  }
+
   tags = { Project = "anlusoft-rekognition" }
   # Un plan que quiera recrear esto borraría datos irrecuperables. Así
   # Terraform falla en vez de destruirlo: el error se revisa a mano.
