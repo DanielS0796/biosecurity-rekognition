@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────
 # WAF delante de los APIs
 # ─────────────────────────────────────────
-# Escrito el 8 de octubre de 2026 y aplicado el 13 sobre los tres APIs de
+# Escrito el 8 de octubre de 2026 y aplicado el 12 sobre los tres APIs de
 # gestión. El 25 de octubre se extendió al API de liveness, con una regla
 # propia para la creación de sesiones, que es la llamada que cuesta.
 #
@@ -342,7 +342,7 @@ resource "aws_wafv2_web_acl_association" "reset" {
 }
 
 # Liveness es la puerta por donde entra la gente todos los días, así que
-# se protegió de último: los otros tres llevaban desde el 13 de octubre
+# se protegió de último: los otros tres llevaban desde el 12 de octubre
 # con el WAF encima. Si una regla llegara a bloquear accesos legítimos,
 # se quita solo esta asociación sin tocar lo demás:
 #
