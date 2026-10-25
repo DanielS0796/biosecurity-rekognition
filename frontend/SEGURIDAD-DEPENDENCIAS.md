@@ -1,14 +1,46 @@
 # Avisos de seguridad en las dependencias
 
-`npm audit` reporta siete avisos en este proyecto. Ninguno es crítico y
-ninguno tiene arreglo disponible hoy. Este archivo explica cuáles son,
+`npm audit` reporta dos avisos moderados en este proyecto, los dos por
+la misma causa (`exceljs` y su `uuid`). Este archivo explica cuáles son,
 por qué siguen ahí y qué habría que hacer el día que aparezca un
 parche, para que nadie tenga que reconstruir el razonamiento desde
 cero.
 
-Última revisión: 8 de octubre de 2026, sobre Next.js 16.4.0.
+Última revisión: 25 de octubre de 2026, sobre Next.js 16.4.3.
 
 ## Lo que sí se arregló
+
+### 25 de octubre de 2026
+
+Next.js 16.4.0 quedó afectado por tres avisos publicados después de la
+revisión anterior, dos de ellos **críticos**:
+
+- [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw):
+  ejecución remota de código sin autenticación en la API de optimización
+  de imágenes cuando se usan archivos SVG.
+- [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr):
+  ejecución remota de código sin autenticación en funciones `use cache`
+  que devuelven arreglos tipados.
+- [GHSA-p3m5-59mp-jv5r](https://github.com/advisories/GHSA-p3m5-59mp-jv5r):
+  denegación de servicio en el App Router con Server Actions.
+
+Los tres afectan hasta la 16.4.0. Se subió a 16.4.3, un salto de
+parche: el build pasa sin cambios en el código y el linter da los
+mismos tres errores que ya tenía antes de actualizar. El aviso apareció
+solo, en medio del `next build`, y por eso conviene leer la salida del
+build y no solo mirar que termine.
+
+Con la actualización de `eslint-config-next` entró `zod` 4.6.5, afectada
+por [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5)
+(**alta**, agotamiento de memoria al validar colecciones enormes). Es
+una dependencia del linter, no corre en el navegador, y `npm audit fix`
+la subió a 4.6.7 sin tocar nada más.
+
+La cadena `braces` → `micromatch` → `fast-glob` → `@next/eslint-plugin-next`
+→ `eslint-config-next`, que la revisión anterior dejaba abierta porque no
+había parche, ya no aparece en el audit.
+
+### 8 de octubre de 2026
 
 Next.js estaba en 16.2.4, afectado por
 [GHSA-8h8q-6873-q5fj](https://github.com/advisories/GHSA-8h8q-6873-q5fj),
@@ -25,7 +57,7 @@ cambios en el código.
 
 ## Lo que queda, y por qué
 
-### La cadena del linter: braces, micromatch, fast-glob, eslint-config-next, @next/eslint-plugin-next
+### La cadena del linter (resuelta el 25 de octubre, se deja como historia)
 
 Cinco avisos, un solo problema de fondo:
 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm),
@@ -72,5 +104,5 @@ npm audit
 
 Si aparece algo **crítico o alto que no esté en esta lista**, hay que
 mirarlo: significa que entró con una dependencia nueva o que se publicó
-un aviso sobre algo que ya estaba. Los siete de acá son conocidos y
+un aviso sobre algo que ya estaba. Los dos de acá son conocidos y
 están aceptados a conciencia, no por inercia.
