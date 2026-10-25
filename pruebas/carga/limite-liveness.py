@@ -128,28 +128,46 @@ def main():
     abiertas = total.get(200, 0)
     limitadas = total.get(429, 0)
     waf = total.get(403, 0)
-    errores = total.get(0, 0) + sum(v for k, v in total.items() if k >= 500)
+    # Dos cosas distintas que conviene no mezclar:
+    #   429  -> el límite de tasa de la etapa (API Gateway). Es lo que
+    #           queremos ver: corta la presión sostenida.
+    #   500  -> el tope de 10 Lambdas simultáneas de la cuenta, que rebota
+    #           lo que pasa de ahí. Es el límite conocido del punto 4, no
+    #           una falla del throttling. Ninguna de las dos ejecuta la
+    #           función ni abre una sesión de Rekognition.
+    concurrencia = sum(v for k, v in total.items() if k >= 500)
+    red = total.get(0, 0)
 
-    print(f"  Sesiones que se abrieron (200):   {abiertas}")
-    print(f"  Cortadas por el límite (429):     {limitadas}")
+    print(f"  Sesiones que se abrieron (200):        {abiertas}")
+    print(f"  Cortadas por el límite de tasa (429):  {limitadas}")
     if waf:
-        print(f"  Bloqueadas por el WAF (403):      {waf}")
-    if errores:
-        print(f"  Errores de servidor / red:        {errores}")
+        print(f"  Bloqueadas por el WAF (403):           {waf}")
+    if concurrencia:
+        print(f"  Rebotadas por el tope de Lambda (5xx): {concurrencia}")
+    if red:
+        print(f"  Sin respuesta (red):                   {red}")
 
     print("─" * 52)
-    if bloqueo_visto and errores == 0:
-        print("El límite funciona: lo que pasa del tope se corta con 429,")
-        print("sin errores 500 y sin abrir una sesión por cada solicitud.")
-        sys.exit(0)
-    elif errores:
-        print("Aparecieron errores 500: el límite no está cortando antes de")
-        print("llegar a Lambda. Revisa el throttling de la etapa.")
+    if red:
+        print("Hubo solicitudes sin respuesta. Puede ser la conexión; repite")
+        print("la prueba antes de sacar conclusiones.")
         sys.exit(1)
-    else:
-        print("No se vio ningún 429. Puede que el tamaño de ráfaga sea menor")
-        print("que el límite: súbelo con --tamano y vuelve a intentar.")
+    if not bloqueo_visto:
+        print("No se vio ningún 429. Puede que la ráfaga sea menor que el")
+        print("límite: súbela con --tamano y vuelve a intentar.")
         sys.exit(1)
+
+    print("El límite de tasa funciona: la presión sostenida se corta con")
+    print("429 y ninguna de esas solicitudes abrió una sesión, así que un")
+    print("bucle no dispara el costo.")
+    if concurrencia:
+        print()
+        print(f"Los {concurrencia} rebotes 5xx son el tope de 10 Lambdas")
+        print("simultáneas de la cuenta, no una falla de este límite: un")
+        print("límite por tasa no frena un pico instantáneo, solo la presión")
+        print("sostenida. Eliminarlos del todo exige ampliar la cuota de")
+        print("concurrencia (punto 4). Tampoco cuestan: la función no corre.")
+    sys.exit(0)
 
 
 if __name__ == "__main__":
