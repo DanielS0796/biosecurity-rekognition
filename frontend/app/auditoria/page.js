@@ -667,7 +667,10 @@ export default function Auditoria() {
                               <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>
                                 {r.motivo_texto}{r.proposito === 'registro' ? ' (registro)' : ''}
                               </td>
-                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#555' }}>{r.confianza ? `${r.confianza.toFixed(1)} %` : '-'}</td>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#555' }}>{r.motivo === 'confianza_baja' || r.confianza
+                                  // Una foto suele sacar menos de 1 %: con un decimal se leería "0.0 %".
+                                  ? `${r.confianza < 1 ? r.confianza.toFixed(2) : r.confianza.toFixed(1)} %`
+                                  : '-'}</td>
                               <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#555' }}>{r.identificacion || '-'}</td>
                             </tr>
                           ))}
