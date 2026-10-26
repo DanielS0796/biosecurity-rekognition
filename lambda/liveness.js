@@ -50,6 +50,14 @@ const TABLE_EMPLEADOS = process.env.TABLE_EMPLEADOS || "biosecurity-empleados";
 const TABLE_RETIRADOS = process.env.TABLE_RETIRADOS || "biosecurity-retirados";
 const TABLE_ACCESOS = process.env.TABLE_ACCESOS || "biosecurity-accesos";
 
+// Los intentos rechazados se guardan en la tabla de accesos para que
+// auditoría los vea, pero se borran solos a los 90 días (TTL sobre
+// "expira"): sirven para notar un patrón, no para llevar un historial de
+// quién falló. No llevan foto ni datos de la persona, salvo la
+// identificación cuando el rostro sí se reconoció (alguien retirado que
+// intenta entrar).
+const DIAS_INTENTOS = Number(process.env.DIAS_INTENTOS || 90);
+
 // Cuánto hacia atrás se busca la entrada abierta de una persona.
 //
 // Antes se filtraba por día UTC, con begins_with sobre fecha_hora. En
@@ -353,6 +361,12 @@ async function procesarResultado(event) {
 
     if (estadoSesion !== "SUCCEEDED") {
         await marcarSesion(sessionId, "fallida");
+        await registrarRechazo({
+            proposito,
+            motivo: estadoSesion === "FAILED" ? "prueba_fallida" : "escaneo_incompleto",
+            detalle: estadoSesion || "",
+            confianza,
+        });
         const motivos = {
             CREATED: "El escaneo no se completó. Intente de nuevo.",
             IN_PROGRESS: "El escaneo aún está en proceso. Espere un momento.",
@@ -368,6 +382,7 @@ async function procesarResultado(event) {
 
     if (confianza < UMBRAL_LIVENESS) {
         await marcarSesion(sessionId, "rechazada");
+        await registrarRechazo({ proposito, motivo: "confianza_baja", confianza });
         log("WARN", "Liveness rechazado por baja confianza", { sessionId, confianza });
         return responder(401, {
             codigo: 1,
@@ -560,6 +575,7 @@ async function validarAcceso({ sessionId, imagen, confianza }) {
     } catch (error) {
         if (/no faces/i.test(error.message || "")) {
             await marcarSesion(sessionId, "fallida");
+            await registrarRechazo({ proposito: "validacion", motivo: "sin_rostro", confianza });
             return responder(401, { codigo: 1, descripcion: "No se detectó un rostro en el escaneo" });
         }
         throw error;
@@ -568,20 +584,7 @@ async function validarAcceso({ sessionId, imagen, confianza }) {
     const match = busqueda.FaceMatches?.[0];
 
     if (!match?.Face?.ExternalImageId) {
-        await dynamo.send(new PutItemCommand({
-            TableName: TABLE_ACCESOS,
-            Item: {
-                id_acceso: { S: idAcceso },
-                fecha_hora: { S: fechaHora },
-                identificacion: { S: "DESCONOCIDO" },
-                nombre: { S: "DESCONOCIDO" },
-                similitud: { N: "0" },
-                resultado: { S: "RECHAZADO" },
-                tipo_acceso: { S: "ENTRADA" },
-                metodo_validacion: { S: "liveness" },
-                liveness_confianza: { N: confianza.toFixed(2) },
-            },
-        }));
+        await registrarRechazo({ proposito: "validacion", motivo: "no_registrado", confianza });
         await marcarSesion(sessionId, "consumida");
 
         log("WARN", "Persona viva pero no registrada", { sessionId });
@@ -602,6 +605,10 @@ async function validarAcceso({ sessionId, imagen, confianza }) {
 
     if (!empleado.Item) {
         await marcarSesion(sessionId, "consumida");
+        await registrarRechazo({
+            proposito: "validacion", motivo: "inactivo", confianza,
+            identificacion, similitud,
+        });
         log("WARN", "Rostro reconocido pero el empleado ya no está activo", { identificacion });
         return responder(401, {
             codigo: 1,
@@ -692,6 +699,43 @@ async function validarAcceso({ sessionId, imagen, confianza }) {
 /* ────────────────────────────────────────────────────────────
  * Utilidades
  * ──────────────────────────────────────────────────────────── */
+
+/**
+ * Deja constancia de un intento rechazado para el módulo de auditoría.
+ *
+ * tipo_acceso es "INTENTO" y no "ENTRADA" a propósito: la búsqueda de la
+ * entrada abierta filtra por ENTRADA, y un rechazo marcado así se tomaría
+ * como una visita sin cerrar y convertiría el siguiente escaneo de esa
+ * persona en una salida.
+ *
+ * Nunca hace fallar la respuesta: si DynamoDB no contesta, la persona
+ * igual recibe su rechazo y solo se pierde el registro.
+ */
+async function registrarRechazo({ proposito, motivo, detalle = "", confianza = 0,
+                                  identificacion = "DESCONOCIDO", similitud = 0 }) {
+    const ahora = new Date();
+    const item = {
+        id_acceso: { S: crypto.randomUUID() },
+        fecha_hora: { S: ahora.toISOString() },
+        identificacion: { S: identificacion },
+        nombre: { S: "DESCONOCIDO" },
+        similitud: { N: Number(similitud || 0).toFixed(2) },
+        resultado: { S: "RECHAZADO" },
+        tipo_acceso: { S: "INTENTO" },
+        metodo_validacion: { S: "liveness" },
+        proposito: { S: proposito === "registro" ? "registro" : "validacion" },
+        motivo: { S: motivo },
+        liveness_confianza: { N: Number(confianza || 0).toFixed(2) },
+        expira: { N: String(Math.floor(ahora.getTime() / 1000) + DIAS_INTENTOS * 86400) },
+    };
+    if (detalle) item.detalle = { S: String(detalle).slice(0, 40) };
+    try {
+        await dynamo.send(new PutItemCommand({ TableName: TABLE_ACCESOS, Item: item }));
+    } catch (error) {
+        log("WARN", "No se pudo guardar el intento rechazado", { motivo, error: error.message });
+    }
+}
+
 async function marcarSesion(sessionId, estado) {
     try {
         await dynamo.send(new UpdateItemCommand({

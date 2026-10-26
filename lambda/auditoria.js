@@ -222,6 +222,47 @@ async function completarDatosPersonales(registros) {
 // Minutos entre la entrada y la salida. Null mientras la visita siga
 // abierta: cero diría que la persona entró y salió en el mismo instante,
 // y vacío no se puede sumar en una hoja de cálculo.
+// Intentos rechazados. Los escribe la Lambda de liveness desde el 25 de
+// octubre de 2026, con motivo; los anteriores (solo "no registrado") no
+// lo tienen y se leen como tal.
+const MOTIVOS = {
+    prueba_fallida: "Falló la prueba de vida",
+    confianza_baja: "Prueba de vida con confianza baja",
+    escaneo_incompleto: "Escaneo sin terminar",
+    sin_rostro: "No se detectó un rostro",
+    no_registrado: "Persona no registrada",
+    inactivo: "Persona retirada o inactiva",
+};
+
+function rechazos(items, { desde, hasta }) {
+    const filas = [];
+    for (const item of items) {
+        const resultado = item.resultado?.S || "";
+        if (resultado !== "RECHAZADO" && resultado !== "FALLIDO") continue;
+        const fechaHora = item.fecha_hora?.S || "";
+        const fecha = fechaLocal(fechaHora);
+        if (!fecha) continue;
+        if (desde && fecha < desde) continue;
+        if (hasta && fecha > hasta) continue;
+        const motivo = item.motivo?.S || "no_registrado";
+        const id = item.identificacion?.S || "DESCONOCIDO";
+        filas.push({
+            fecha_hora: fechaHora,
+            fecha,
+            hora: horaLocal(fechaHora),
+            motivo,
+            motivo_texto: MOTIVOS[motivo] || motivo,
+            proposito: item.proposito?.S || "validacion",
+            confianza: Number(item.liveness_confianza?.N || 0),
+            identificacion: id === "DESCONOCIDO" ? "" : id,
+        });
+    }
+    filas.sort((a, b) => b.fecha_hora.localeCompare(a.fecha_hora));
+    const porMotivo = {};
+    for (const f of filas) porMotivo[f.motivo] = (porMotivo[f.motivo] || 0) + 1;
+    return { filas, porMotivo };
+}
+
 function minutosDentro(entrada, salida) {
     if (!entrada || !salida) return null;
     const ms = new Date(salida) - new Date(entrada);
@@ -270,6 +311,35 @@ exports.handler = Sentry.wrapHandler(async (event) => {
         const hasta = esFecha(q.hasta) ? q.hasta : null;
 
         const items = await leerAccesos({ desde, hasta });
+
+        if (q.tipo === "rechazos") {
+            const { filas, porMotivo } = rechazos(items, { desde, hasta });
+            log("INFO", "Rechazos consultados", {
+                por: quien.usuario, total: filas.length, desde, hasta,
+                duration_ms: Date.now() - startTime,
+            });
+            if (q.format === "json") {
+                return {
+                    statusCode: 200,
+                    headers: { ...CORS, "Content-Type": "application/json" },
+                    body: JSON.stringify({ items: filas, total: filas.length, por_motivo: porMotivo, desde, hasta }),
+                };
+            }
+            const lineas = [
+                ["Fecha", "Hora", "Motivo", "Proposito", "Confianza Liveness", "Identificacion"],
+                ...filas.map(f => [f.fecha, f.hora, f.motivo_texto, f.proposito, f.confianza.toFixed(2), f.identificacion]),
+            ].map(fila => fila.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
+            return {
+                statusCode: 200,
+                headers: {
+                    ...CORS,
+                    "Content-Type": "text/csv; charset=utf-8",
+                    "Content-Disposition": `attachment; filename=rechazos_${new Date().toISOString().split("T")[0]}.csv`,
+                },
+                body: "\ufeff" + lineas.join("\r\n"),
+            };
+        }
+
         let registros = agrupar(items);
 
         // Recorte exacto por día local, ya sin el margen del Scan.

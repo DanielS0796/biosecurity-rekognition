@@ -410,6 +410,92 @@ rs = await post('/liveness-init', { proposito: 'REGISTRO', identificacion: '777'
 check('un propósito raro no se vuelve registro',
   rs.body.proposito === 'validacion', JSON.stringify(rs.body));
 
+console.log('\n── Intentos rechazados quedan para auditoría (punto 6) ──');
+// Antes solo quedaba constancia de "persona no registrada". Una foto o un
+// video frente a la cámara (prueba de vida fallida) no dejaba nada, y era
+// justamente el intento que más interesa ver.
+const ultimoRechazo = () => Object.values(dyn.__estado.tablas['biosecurity-accesos'] || {})
+  .filter(i => i.resultado?.S === 'RECHAZADO')
+  .sort((a, b) => a.fecha_hora.S.localeCompare(b.fecha_hora.S)).pop();
+async function rechazo(sesionId, resultado, busqueda, proposito = 'validacion') {
+  limpiarAccesos();
+  rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: sesionId };
+  const pedido = proposito === 'registro'
+    ? { proposito, identificacion: `r-${sesionId}`, nombre: 'Prueba', ...AUTORIZA }
+    : { proposito };
+  await post('/liveness-init', pedido);
+  rek.__estado.respuestas.GetFaceLivenessSessionResultsCommand = resultado;
+  rek.__estado.respuestas.SearchFacesByImageCommand = busqueda;
+  const r = await post('/liveness-result', { session_id: sesionId });
+  return { r, item: ultimoRechazo() };
+}
+
+reset();
+let rz = await rechazo('s-rz1', { Status: 'FAILED', Confidence: 0 });
+check('prueba de vida fallida -> queda con motivo prueba_fallida', rz.item?.motivo?.S === 'prueba_fallida', JSON.stringify(rz.item));
+check('sin foto ni nombre', rz.item && !rz.item.imagen && rz.item.nombre.S === 'DESCONOCIDO' && rz.item.identificacion.S === 'DESCONOCIDO');
+const ahoraSeg = Math.floor(Date.now() / 1000);
+const expira = Number(rz.item?.expira?.N);
+check('se borra solo en unos 90 días', expira > ahoraSeg + 89 * 86400 && expira <= ahoraSeg + 91 * 86400, `-> ${expira}`);
+check('tipo_acceso INTENTO, no ENTRADA', rz.item?.tipo_acceso?.S === 'INTENTO');
+check('la respuesta sigue siendo 401', rz.r.status === 401, `-> ${rz.r.status}`);
+
+reset();
+rz = await rechazo('s-rz2', { Status: 'EXPIRED', Confidence: 0 });
+check('sesión vencida -> escaneo_incompleto, con el estado', rz.item?.motivo?.S === 'escaneo_incompleto' && rz.item?.detalle?.S === 'EXPIRED', JSON.stringify(rz.item));
+
+reset();
+rz = await rechazo('s-rz3', { Status: 'SUCCEEDED', Confidence: 42.5, ReferenceImage: { Bytes: Buffer.from('z') } });
+check('confianza baja -> confianza_baja con la confianza', rz.item?.motivo?.S === 'confianza_baja' && rz.item?.liveness_confianza?.N === '42.50', JSON.stringify(rz.item));
+
+reset();
+rz = await rechazo('s-rz4', { Status: 'FAILED', Confidence: 0 }, undefined, 'registro');
+check('en el registro también queda, marcado como registro', rz.item?.motivo?.S === 'prueba_fallida' && rz.item?.proposito?.S === 'registro', JSON.stringify(rz.item));
+
+reset();
+rz = await rechazo('s-rz5', { Status: 'SUCCEEDED', Confidence: 98, ReferenceImage: { Bytes: Buffer.from('y') } }, { FaceMatches: [] });
+check('no registrado -> no_registrado', rz.item?.motivo?.S === 'no_registrado', JSON.stringify(rz.item));
+
+reset();
+dyn.__estado.tablas['biosecurity-empleados'] = {};
+rz = await rechazo('s-rz6', { Status: 'SUCCEEDED', Confidence: 98, ReferenceImage: { Bytes: Buffer.from('y') } },
+  { FaceMatches: [{ Similarity: 99.3, Face: { ExternalImageId: '4040', FaceId: 'f-ret' } }] });
+check('retirado -> inactivo, con su identificación', rz.item?.motivo?.S === 'inactivo' && rz.item?.identificacion?.S === '4040', JSON.stringify(rz.item));
+
+reset();
+rz = await rechazo('s-rz7', { Status: 'SUCCEEDED', Confidence: 98, ReferenceImage: { Bytes: Buffer.from('y') } },
+  Object.assign(new Error('There are no faces in the image'), { name: 'InvalidParameterException' }));
+check('sin rostro -> sin_rostro', rz.item?.motivo?.S === 'sin_rostro', JSON.stringify(rz.item));
+
+// Un rechazo de alguien que luego vuelve a estar activo no puede tomarse
+// como su entrada abierta: el siguiente escaneo tiene que ser ENTRADA.
+reset(); limpiarAccesos();
+dyn.__estado.tablas['biosecurity-empleados'] = {};
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-rz8' };
+await post('/liveness-init', { proposito: 'validacion' });
+rek.__estado.respuestas.GetFaceLivenessSessionResultsCommand = { Status: 'SUCCEEDED', Confidence: 98, ReferenceImage: { Bytes: Buffer.from('y') } };
+rek.__estado.respuestas.SearchFacesByImageCommand = { FaceMatches: [{ Similarity: 99.1, Face: { ExternalImageId: '123', FaceId: 'f1' } }] };
+await post('/liveness-result', { session_id: 's-rz8' });
+const rechazoGuardado = ultimoRechazo();
+conPersona();
+const tras = await escanear('s-rz9');
+check('tras un rechazo, el escaneo siguiente es ENTRADA', tras.body.tipo_acceso === 'ENTRADA', tras.body.tipo_acceso);
+check('y el rechazo no se modificó', rechazoGuardado && !rechazoGuardado.hora_salida);
+
+// Si DynamoDB falla al guardar el rechazo, la persona igual recibe su 401.
+reset(); limpiarAccesos();
+rek.__estado.respuestas.CreateFaceLivenessSessionCommand = { SessionId: 's-rz10' };
+await post('/liveness-init', { proposito: 'validacion' });
+rek.__estado.respuestas.GetFaceLivenessSessionResultsCommand = { Status: 'FAILED', Confidence: 0 };
+const sendOriginal = dyn.DynamoDBClient.prototype.send;
+dyn.DynamoDBClient.prototype.send = async function (cmd) {
+  if (cmd.tipo === 'PutItemCommand' && cmd.input.TableName === 'biosecurity-accesos') throw new Error('caída simulada');
+  return sendOriginal.call(this, cmd);
+};
+const rCaida = await post('/liveness-result', { session_id: 's-rz10' });
+dyn.DynamoDBClient.prototype.send = sendOriginal;
+check('si no se puede guardar el rechazo, igual responde 401', rCaida.status === 401, `-> ${rCaida.status}`);
+
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();

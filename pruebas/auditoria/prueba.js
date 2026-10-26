@@ -297,6 +297,46 @@ check('con sesión de auditoría sí -> 200', s1.status === 200 && s1.json.items
 const pre = await handler({ httpMethod: 'OPTIONS', headers: {} });
 check('el preflight permite la cabecera Authorization', /Authorization/.test(pre.headers['Access-Control-Allow-Headers']));
 
+console.log('\n── Intentos rechazados (tipo=rechazos) ──');
+reset();
+const rechazo = (fechaHora, motivo, extra = {}) => ({
+  id_acceso: { S: `rz-${fechaHora}` },
+  fecha_hora: { S: fechaHora },
+  identificacion: { S: extra.id || 'DESCONOCIDO' },
+  nombre: { S: 'DESCONOCIDO' },
+  resultado: { S: 'RECHAZADO' },
+  tipo_acceso: { S: 'INTENTO' },
+  liveness_confianza: { N: extra.conf || '0.00' },
+  ...(motivo ? { motivo: { S: motivo } } : {}),
+});
+dyn.__estado.accesos = [
+  acceso('100', 'Ana', '2026-10-06T14:00:00Z', 'ENTRADA'),
+  rechazo('2026-10-06T15:00:00Z', 'prueba_fallida'),
+  rechazo('2026-10-06T16:00:00Z', 'confianza_baja', { conf: '41.20' }),
+  rechazo('2026-10-06T17:00:00Z', 'inactivo', { id: '4040', conf: '98.00' }),
+  rechazo('2026-10-06T18:00:00Z', null),                 // anterior al motivo
+  rechazo('2026-10-08T15:00:00Z', 'prueba_fallida'),     // fuera del rango
+];
+let rz = await pedir({ format: 'json', tipo: 'rechazos', desde: '2026-10-06', hasta: '2026-10-06' });
+check('devuelve solo los rechazos del rango', rz.status === 200 && rz.json.items.length === 4, `-> ${rz.json?.items?.length}`);
+check('no mezcla las visitas', !rz.json.items.some(i => i.identificacion === '100'));
+check('el más reciente primero', rz.json.items[0]?.hora === '13:00', rz.json.items[0]?.hora);
+check('uno sin motivo se lee como no registrado', rz.json.items[0]?.motivo === 'no_registrado');
+check('cuenta por motivo', rz.json.por_motivo.prueba_fallida === 1 && rz.json.por_motivo.confianza_baja === 1 && rz.json.por_motivo.inactivo === 1, JSON.stringify(rz.json.por_motivo));
+check('trae el texto legible', rz.json.items.some(i => i.motivo_texto === 'Falló la prueba de vida'));
+check('identificación vacía si no se reconoció a nadie', rz.json.items.find(i => i.motivo === 'prueba_fallida')?.identificacion === '');
+check('y la del retirado cuando sí', rz.json.items.find(i => i.motivo === 'inactivo')?.identificacion === '4040');
+check('la confianza como número', rz.json.items.find(i => i.motivo === 'confianza_baja')?.confianza === 41.2);
+
+let visitas = await pedir({ format: 'json', desde: '2026-10-06', hasta: '2026-10-06' });
+check('el reporte de visitas sigue sin rechazos', visitas.json.items.length === 1, `-> ${visitas.json.items.length}`);
+
+const csvRz = await pedir({ tipo: 'rechazos', desde: '2026-10-06', hasta: '2026-10-06' });
+check('el CSV de rechazos tiene encabezado y 4 filas', csvRz.body.split('\r\n').length === 5 && /Motivo/.test(csvRz.body));
+
+check('sin sesión -> 401', (await pedir({ format: 'json', tipo: 'rechazos' }, null)).status === 401);
+check('con sesión de RR. HH. -> 403', (await pedir({ format: 'json', tipo: 'rechazos' }, sesion.emitir('rrhh').token)).status === 403);
+
 console.log(`\n${'─'.repeat(50)}\n${pasaron} pasaron · ${fallaron} fallaron\n`);
 process.exit(fallaron ? 1 : 0);
 })();

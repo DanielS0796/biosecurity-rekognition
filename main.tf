@@ -262,6 +262,13 @@ resource "aws_dynamodb_table" "accesos" {
     projection_type = "ALL"
   }
 
+  # Solo los intentos rechazados llevan "expira" (90 días). Los accesos
+  # válidos no tienen ese atributo y DynamoDB nunca los borra.
+  ttl {
+    attribute_name = "expira"
+    enabled        = true
+  }
+
   # Respaldo continuo: permite restaurar la tabla a cualquier segundo de
   # los últimos 35 días. prevent_destroy cuida que Terraform no la borre;
   # esto cubre lo demás (un borrado desde la consola, un script con un

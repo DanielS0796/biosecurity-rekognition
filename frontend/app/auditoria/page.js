@@ -78,6 +78,10 @@ export default function Auditoria() {
   }
 
   const [datos, setDatos] = useState([])
+  // Intentos rechazados del mismo rango: quién no pasó la prueba de vida
+  // o no estaba registrado. Sin foto ni nombre; solo cuándo y por qué.
+  const [rechazos, setRechazos] = useState([])
+  const [porMotivo, setPorMotivo] = useState({})
   const [busqueda, setBusqueda] = useState('')
   const [actualizado, setActualizado] = useState(null)
 
@@ -147,6 +151,9 @@ export default function Auditoria() {
     setLoginPass('')
     setLoginUser('')
     setDatos([])
+    setRechazos([])
+    setPorMotivo({})
+    setActualizado(null)
   }
 
   // El filtro de fechas lo resuelve el servidor. Antes el Lambda devolvía
@@ -170,6 +177,21 @@ export default function Auditoria() {
     } catch (err) {
       setDatos([])
       setErrorCarga('No se pudieron cargar los registros: ' + err.message)
+    }
+    // Aparte: si esta consulta falla, la tabla de visitas igual se muestra.
+    try {
+      const params = new URLSearchParams({ format: 'json', tipo: 'rechazos' })
+      if (fechaDesde) params.set('desde', fechaDesde)
+      if (fechaHasta) params.set('hasta', fechaHasta)
+      const r = await fetch(`${API_AUDITORIA}?${params}`, { headers: conSesion() })
+      if (r.ok) {
+        const body = await r.json()
+        setRechazos(body.items || [])
+        setPorMotivo(body.por_motivo || {})
+      }
+    } catch {
+      setRechazos([])
+      setPorMotivo({})
     }
     setLoading(false)
   }
@@ -608,6 +630,53 @@ export default function Auditoria() {
                 </div>
             }
           </div>
+
+          {/* INTENTOS RECHAZADOS */}
+          {actualizado && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)', marginBottom: 4 }}>Intentos rechazados</div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 12, lineHeight: 1.5 }}>
+                Mismo rango de fechas. No se guarda foto ni nombre, y cada registro se borra solo a los 90 días.
+              </div>
+              {rechazos.length === 0
+                ? <div style={{ textAlign: 'center', padding: '20px', color: '#aaa', fontSize: 14 }}>Ningún intento rechazado en este período</div>
+                : <>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                      {Object.entries(porMotivo).map(([m, n]) => (
+                        <span key={m} style={{ background: '#fdecea', color: '#c62828', border: '1px solid #f5c2c0', borderRadius: 'var(--r-pildora)', padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>
+                          {(rechazos.find(r => r.motivo === m)?.motivo_texto) || m}: {n}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ overflowX: 'auto', borderRadius: 'var(--r-control)' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                        <thead>
+                          <tr>
+                            {['Fecha y hora', 'Motivo', 'Confianza', 'Identificación'].map((h, i, arr) => (
+                              <th key={i} style={{ background: 'var(--blue)', color: 'white', padding: '11px 12px', textAlign: 'left', fontWeight: 700, whiteSpace: 'nowrap', borderRadius: i === 0 ? '10px 0 0 0' : i === arr.length - 1 ? '0 10px 0 0' : 0 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rechazos.map((r, i) => (
+                            <tr key={i}>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 600 }}>{r.hora}</div>
+                                <div style={{ fontSize: 11, color: '#999' }}>{r.fecha}</div>
+                              </td>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0' }}>
+                                {r.motivo_texto}{r.proposito === 'registro' ? ' (registro)' : ''}
+                              </td>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#555' }}>{r.confianza ? `${r.confianza.toFixed(1)} %` : '-'}</td>
+                              <td style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', color: '#555' }}>{r.identificacion || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>}
+            </div>
+          )}
 
         </div>
 
