@@ -10,29 +10,52 @@ variable "alert_email" {
 }
 
 # ─────────────────────────────────────────
-# CloudWatch Log Groups (7 days retention)
+# CloudWatch Log Groups (90 días)
 # ─────────────────────────────────────────
+# Eran 7 días. El 25 de octubre de 2026 se quiso revisar qué causó los
+# 5xx del 8 de octubre y los logs ya no existían. En un control de acceso
+# la pregunta "¿qué pasó tal día?" llega semanas después. 90 días
+# coincide con lo que se guardan los intentos rechazados y cuesta
+# centavos con este volumen.
+locals {
+  dias_logs = 90
+}
+
+# El grupo de liveness lo creó Lambda sola y quedó sin vencimiento: se
+# guardaba para siempre, con identificaciones en los logs. Se importa
+# para que tenga el mismo plazo que los demás.
+import {
+  to = aws_cloudwatch_log_group.liveness_logs
+  id = "/aws/lambda/biosecurity-liveness-detection"
+}
+
+resource "aws_cloudwatch_log_group" "liveness_logs" {
+  name              = "/aws/lambda/biosecurity-liveness-detection"
+  retention_in_days = local.dias_logs
+  tags              = { Project = "anlusoft-rekognition", Module = "observability" }
+}
+
 resource "aws_cloudwatch_log_group" "validacion_logs" {
   name              = "/aws/lambda/validacionderostros"
-  retention_in_days = 7
+  retention_in_days = local.dias_logs
   tags              = { Project = "anlusoft-rekognition", Module = "observability" }
 }
 
 resource "aws_cloudwatch_log_group" "registrar_logs" {
   name              = "/aws/lambda/biosecurity-registrar-empleado"
-  retention_in_days = 7
+  retention_in_days = local.dias_logs
   tags              = { Project = "anlusoft-rekognition", Module = "observability" }
 }
 
 resource "aws_cloudwatch_log_group" "auditoria_logs" {
   name              = "/aws/lambda/biosecurity-auditoria"
-  retention_in_days = 7
+  retention_in_days = local.dias_logs
   tags              = { Project = "anlusoft-rekognition", Module = "observability" }
 }
 
 resource "aws_cloudwatch_log_group" "reset_logs" {
   name              = "/aws/lambda/biosecurity-reset"
-  retention_in_days = 7
+  retention_in_days = local.dias_logs
   tags              = { Project = "anlusoft-rekognition", Module = "observability" }
 }
 
